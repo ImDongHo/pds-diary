@@ -1,0 +1,2379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDS Diary</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f3f5f4; --white: #ffffff;
+  --gray: #6b7280; --dark-gray: #4b5563; --soft-gray: #eef0f2; --line: #e8eaed;
+  --text: #20242c; --sub: #858b96; --muted: #a5aab2;
+  --mint: #d9eeea; --mint-dark: #7bb8ad;
+  --pink: #f7dce8; --pink-dark: #d98cab;
+  --yellow: #f9e5a9; --yellow-dark: #d7ad3e;
+  --purple: #ddd4f0; --purple-dark: #9a87c7;
+  --blue: #dbe8f7; --blue-dark: #739ac9;
+  --red: #f3d4d4; --red-dark: #d47d7d;
+  --shadow: 0 10px 30px rgba(31, 40, 55, 0.06);
+  --shadow-hover: 0 16px 34px rgba(31, 40, 55, 0.10);
+}
+
+html { overflow-x: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-wrap: anywhere; }
+button, input, textarea, select { font-family: inherit; }
+button { border: 0; cursor: pointer; }
+input, textarea, select { outline: none; }
+.hidden { display: none !important; }
+
+.app { min-height: 100vh; display: flex; padding: 24px; gap: 18px; }
+
+.sidebar { width: 76px; background: var(--gray); border-radius: 28px; padding: 22px 12px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; box-shadow: var(--shadow); }
+.logo { width: 44px; height: 44px; background: white; color: var(--gray); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; margin-bottom: 42px; }
+.nav { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.nav-btn { width: 52px; height: 52px; border-radius: 17px; background: transparent; color: #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: 0.2s; }
+.nav-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+.nav-btn.active { background: white; color: var(--gray); }
+.sidebar-bottom { margin-top: auto; }
+
+.main { flex: 1; max-width: 1450px; margin: 0 auto; min-width: 0; }
+
+.top { display: flex; align-items: center; justify-content: space-between; margin: 4px 8px 22px; }
+.greeting h1 { font-size: 28px; font-weight: 750; letter-spacing: -1px; }
+.greeting p { margin-top: 6px; color: var(--sub); font-size: 14px; }
+.top-right { display: flex; align-items: center; gap: 12px; }
+.date-chip { background: white; padding: 11px 15px; border-radius: 18px; box-shadow: var(--shadow); color: #666d78; font-size: 13px; }
+.profile { width: 46px; height: 46px; background: var(--yellow); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 21px; }
+
+.notice { background: #fffdf4; border: 1px solid #f0e5b9; color: #7d704b; border-radius: 16px; padding: 12px 16px; margin-bottom: 22px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.notice button { background: transparent; color: #8a7c52; font-size: 12px; }
+
+.page { display: none; animation: pageIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; margin: 0 8px 22px; }
+.page-title h2 { font-size: 25px; letter-spacing: -0.7px; }
+.page-title p { margin-top: 5px; color: var(--sub); font-size: 13px; }
+.page-actions { display: flex; gap: 8px; }
+
+.btn { min-height: 40px; padding: 0 15px; border-radius: 13px; font-size: 12px; font-weight: 600; transition: 0.2s; }
+.btn-gray { background: var(--gray); color: white; }
+.btn-gray:hover { background: var(--dark-gray); }
+.btn-light { background: white; color: #5d6470; border: 1px solid var(--line); }
+.btn-light:hover { background: #f8f9fa; }
+.btn-danger { background: #faeeee; color: var(--red-dark); }
+.btn-danger:hover { background: #f7e1e1; }
+
+.dashboard { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(330px, 0.85fr); gap: 20px; }
+.left-column, .right-column { display: flex; flex-direction: column; gap: 20px; }
+
+.section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; flex-wrap: wrap; gap: 8px; }
+.section-title h3, .section-title h2 { font-size: 18px; letter-spacing: -0.4px; flex-shrink: 0; }
+.section-title span { color: var(--sub); font-size: 11px; }
+.section-title select { max-width: 160px; }
+
+.plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-height: 70vh; overflow-y: auto; padding: 4px 6px 4px 2px; }
+.plan-card { position: relative; min-height: 174px; padding: 20px; border-radius: 24px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.plan-card:hover { box-shadow: var(--shadow-hover); transform: scale(1.012); }
+.plan-card.mint { background: var(--mint); } .plan-card.pink { background: var(--pink); } .plan-card.yellow { background: var(--yellow); }
+.plan-card.purple { background: var(--purple); } .plan-card.blue { background: var(--blue); } .plan-card.red { background: var(--red); }
+.plan-card-head { display: flex; align-items: center; justify-content: space-between; }
+.category { font-size: 11px; font-weight: 700; opacity: 0.58; letter-spacing: 0.5px; }
+.priority { background: rgba(255,255,255,0.62); border-radius: 20px; padding: 6px 9px; font-size: 10px; }
+.plan-card h3 { margin-top: 16px; font-size: 19px; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plan-card p { margin-top: 6px; color: rgba(30,35,40,0.58); font-size: 11px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-link { display: inline-block; font-size: 10px; font-weight: 700; color: rgba(30,35,40,0.55); text-decoration: underline; cursor: pointer; background: none; border: 0; padding: 0; white-space: nowrap; }
+#taskDetailTitle.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#taskDetailPlanName.clamped { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.detail-link:hover { color: rgba(30,35,40,0.8); }
+.plan-bottom { position: absolute; left: 20px; right: 20px; bottom: 17px; display: flex; align-items: center; justify-content: space-between; }
+.plan-time { color: rgba(30,35,40,0.62); font-size: 11px; }
+.complete-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.82); color: var(--gray); display: flex; align-items: center; justify-content: center; font-size: 17px; transition: 0.2s; }
+.complete-btn:hover { transform: scale(1.08); background: white; }
+
+.add-plan { background: white; border-radius: 24px; padding: 20px; box-shadow: var(--shadow); }
+.add-plan-form { display: grid; grid-template-columns: 1fr 160px auto; gap: 9px; }
+.input { width: 100%; height: 42px; border: 1px solid var(--line); background: #f8f9fa; border-radius: 13px; padding: 0 13px; color: var(--text); font-size: 12px; }
+.input:focus { background: white; border-color: #d2d6db; box-shadow: 0 0 0 3px #f0f1f2; }
+textarea.input { height: 90px; padding: 12px; resize: vertical; }
+
+.progress-panel { background: white; border-radius: 24px; padding: 20px; box-shadow: var(--shadow); }
+.progress-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.progress-card { border-radius: 18px; padding: 16px; }
+.progress-card.mint { background: var(--mint); } .progress-card.yellow { background: var(--yellow); } .progress-card.purple { background: var(--purple); }
+.progress-card .label { font-size: 11px; opacity: 0.65; }
+.progress-card .value { margin-top: 8px; font-size: 25px; font-weight: 750; }
+
+.calendar { background: white; border-radius: 26px; padding: 22px; box-shadow: var(--shadow); }
+.calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.calendar-month { font-size: 17px; font-weight: 750; }
+.calendar-nav { display: flex; gap: 5px; }
+.calendar-nav button { width: 30px; height: 30px; border-radius: 50%; background: #f5f6f7; color: #606672; font-size: 15px; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+.weekdays { margin-bottom: 8px; }
+.weekdays span { color: #9ba0a8; font-size: 9px; font-weight: 650; }
+.days { row-gap: 7px; }
+.day { width: 35px; height: 35px; margin: auto; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; color: #555b65; font-size: 11px; cursor: pointer; transition: 0.18s; }
+.day:hover { background: #f0f2f3; }
+.day.selected { background: var(--gray); color: white; font-weight: 700; }
+.day.today { border: 2px solid var(--mint-dark); font-weight: 700; }
+.day.selected.today { border: 2px solid white; outline: 2px solid var(--gray); }
+.day.has-plan::after { content: ""; position: absolute; bottom: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--pink-dark); }
+.day.selected.has-plan::after { background: white; }
+.day.empty { cursor: default; }
+
+.selected-date { background: var(--mint); border-radius: 20px; padding: 17px; }
+.selected-date .small { color: #668c85; font-size: 10px; }
+.selected-date h3 { margin-top: 5px; font-size: 17px; }
+.selected-date p { margin-top: 5px; color: #668c85; font-size: 11px; }
+
+.see-panel { background: white; border-radius: 24px; padding: 20px; box-shadow: var(--shadow); }
+.see-item { display: flex; align-items: center; gap: 11px; padding: 10px 0; border-bottom: 1px solid #f0f1f2; }
+.see-item:last-child { border-bottom: 0; }
+.see-icon { width: 34px; height: 34px; flex-shrink: 0; background: var(--purple); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.see-text { flex: 1; }
+.see-text strong { display: block; font-size: 12px; }
+.see-text span { display: block; margin-top: 3px; color: var(--sub); font-size: 10px; }
+
+.panel { background: white; border-radius: 24px; padding: 20px; box-shadow: var(--shadow); }
+.panel-stack { display: flex; flex-direction: column; gap: 16px; }
+
+.plan-layout { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 20px; }
+.plan-list { display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; padding-right: 6px; }
+.plan-list-card { background: white; border-radius: 20px; padding: 17px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px; }
+.plan-color { width: 10px; height: 62px; border-radius: 8px; flex-shrink: 0; }
+.plan-color.mint { background: var(--mint-dark); } .plan-color.pink { background: var(--pink-dark); } .plan-color.yellow { background: var(--yellow-dark); }
+.plan-color.purple { background: var(--purple-dark); } .plan-color.blue { background: var(--blue-dark); } .plan-color.red { background: var(--red-dark); }
+.plan-info { flex: 1; min-width: 0; }
+.plan-info .meta { color: var(--sub); font-size: 10px; margin-bottom: 5px; }
+.plan-info h3 { font-size: 14px; }
+.plan-info p { margin-top: 4px; color: var(--sub); font-size: 11px; }
+.plan-card-actions { display: flex; gap: 6px; }
+.icon-btn { width: 34px; height: 34px; background: #f5f6f7; color: #6b7280; border-radius: 11px; font-size: 13px; }
+.icon-btn:hover { background: #e9ebed; }
+
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-label { color: #656c77; font-size: 11px; font-weight: 600; }
+.color-options { display: flex; gap: 8px; padding: 7px 0; }
+.color-option { width: 30px; height: 30px; border-radius: 50%; border: 3px solid transparent; position: relative; transition: 0.15s; }
+.color-option.selected { border-color: #555b64; transform: scale(1.08); }
+.color-option.mint { background: var(--mint); } .color-option.pink { background: var(--pink); } .color-option.yellow { background: var(--yellow); }
+.color-option.purple { background: var(--purple); } .color-option.blue { background: var(--blue); } .color-option.red { background: var(--red); }
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+.task-toolbar { background: white; border-radius: 20px; padding: 14px; box-shadow: var(--shadow); display: grid; grid-template-columns: 1fr 140px 140px; gap: 8px; margin-bottom: 14px; }
+.task-toolbar.task-toolbar-4col { grid-template-columns: 1fr 140px 140px 160px; }
+.task-list { display: flex; flex-direction: column; gap: 9px; max-height: 70vh; overflow-y: auto; padding-right: 6px; }
+.task-row { background: white; border-radius: 18px; padding: 14px 16px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; }
+.task-check { width: 24px; height: 24px; border-radius: 8px; border: 2px solid #d5d9dd; background: white; flex-shrink: 0; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.task-check.done { background: var(--mint-dark); border-color: var(--mint-dark); }
+.task-main { flex: 1; min-width: 0; }
+.task-main h3 { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.task-main h3.done { color: #a1a6ad; text-decoration: line-through; }
+.task-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.tag { background: #f0f1f2; color: #717780; padding: 4px 7px; border-radius: 8px; font-size: 9px; }
+.tag.deadline { background: #f8e9e9; color: #b97979; }
+.tag.blocked { background: #fdeee0; color: #b9803f; }
+.task-estimate { width: 70px; color: var(--sub); text-align: right; font-size: 10px; }
+
+.do-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.execution-list { display: flex; flex-direction: column; gap: 9px; max-height: 70vh; overflow-y: auto; padding-right: 6px; }
+.execution-card { background: white; border-radius: 18px; padding: 15px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; }
+.execution-icon { width: 40px; height: 40px; border-radius: 13px; background: var(--mint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.execution-info { flex: 1; min-width: 0; }
+.execution-info strong { display: block; font-size: 12px; }
+.execution-info span { display: block; margin-top: 4px; color: var(--sub); font-size: 10px; }
+.execution-time { color: var(--gray); font-size: 11px; font-weight: 700; }
+
+.see-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.summary-card { background: white; border-radius: 20px; padding: 18px; box-shadow: var(--shadow); }
+.summary-card .summary-label { color: var(--sub); font-size: 10px; }
+.summary-card .summary-value { margin-top: 8px; font-size: 25px; font-weight: 750; }
+.summary-card.mint .summary-value { color: var(--mint-dark); }
+.summary-card.green .summary-value { color: #72a487; }
+.summary-card.red .summary-value { color: var(--red-dark); }
+.summary-card.orange .summary-value { color: #c68a58; }
+.see-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.time-compare { display: flex; flex-direction: column; gap: 15px; }
+.time-row { display: flex; align-items: center; gap: 12px; }
+.time-row-label { width: 55px; font-size: 11px; color: var(--sub); }
+.time-bar { flex: 1; height: 14px; background: #f0f1f2; border-radius: 20px; overflow: hidden; }
+.time-fill { height: 100%; border-radius: 20px; }
+.time-fill.estimate { background: var(--purple-dark); }
+.time-fill.actual { background: var(--mint-dark); }
+.time-number { width: 55px; text-align: right; font-size: 11px; font-weight: 700; }
+.insight { background: var(--yellow); border-radius: 20px; padding: 18px; }
+.insight small { color: #8a7847; font-size: 10px; }
+.insight h3 { margin-top: 7px; font-size: 16px; }
+.insight p { margin-top: 7px; color: #806f43; font-size: 11px; line-height: 1.6; }
+
+.execution-form { display: flex; flex-direction: column; gap: 12px; }
+.execution-records { margin-top: 16px; }
+
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.setting-card { background: white; border-radius: 24px; padding: 20px; box-shadow: var(--shadow); }
+.setting-card h3 { font-size: 15px; }
+.setting-card p { margin-top: 6px; color: var(--sub); font-size: 11px; line-height: 1.6; }
+.setting-buttons { display: flex; gap: 8px; margin-top: 16px; }
+.warning-box { margin-top: 14px; background: #fff7e8; border: 1px solid #f2dfb6; color: #846d3e; border-radius: 15px; padding: 12px; font-size: 10px; line-height: 1.6; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(31, 35, 42, 0.35); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+.modal-overlay.open { display: flex; }
+.modal { width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; background: white; border-radius: 26px; padding: 23px; box-shadow: 0 30px 70px rgba(20, 25, 30, 0.18); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.modal-head h3 { font-size: 18px; }
+.modal-close { width: 34px; height: 34px; border-radius: 50%; background: #f3f4f5; color: #737983; }
+
+.empty-state { background: white; border-radius: 22px; padding: 50px 20px; text-align: center; color: var(--sub); box-shadow: var(--shadow); }
+.empty-state .emoji { font-size: 30px; margin-bottom: 9px; }
+.empty-state strong { display: block; color: #666c75; font-size: 13px; }
+.empty-state p { margin-top: 5px; font-size: 11px; }
+
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: #4b5563; color: white; padding: 11px 17px; border-radius: 14px; font-size: 11px; opacity: 0; pointer-events: none; transition: 0.25s; z-index: 2000; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 1100px) {
+  .dashboard { grid-template-columns: 1fr; }
+  .right-column { display: grid; grid-template-columns: 1fr 1fr; }
+  .plan-layout, .do-layout, .see-grid, .settings-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 850px) {
+  .see-summary { grid-template-columns: repeat(2, 1fr); }
+  .task-toolbar { grid-template-columns: 1fr 1fr; }
+  .task-toolbar.task-toolbar-4col { grid-template-columns: 1fr 1fr; }
+  .task-toolbar .search { grid-column: 1 / -1; }
+}
+@media (max-width: 650px) {
+  .app { padding: 12px; }
+  .sidebar { width: 62px; border-radius: 20px; padding: 18px 8px; }
+  .logo { width: 38px; height: 38px; margin-bottom: 28px; }
+  .nav-btn { width: 44px; height: 44px; }
+  .top { align-items: flex-start; gap: 12px; }
+  .date-chip { display: none; }
+  .greeting h1 { font-size: 22px; }
+  .plan-grid { grid-template-columns: 1fr; }
+  .right-column { display: flex; }
+  .add-plan-form { grid-template-columns: 1fr; }
+  .progress-cards { grid-template-columns: 1fr; }
+  .see-summary { grid-template-columns: 1fr 1fr; }
+}
+
+/* Tasks 보기 전환 버튼 — 목록/날짜별/월별 */
+.filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: #eef0f2;
+  border: 1px solid #e4e7ea;
+  border-radius: 14px;
+}
+.filter-group .filter-btn {
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 10px;
+  background: transparent;
+  color: #8a9099;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: -0.1px;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.filter-group .filter-btn:hover {
+  background: rgba(255,255,255,0.72);
+  color: #59606a;
+}
+.filter-group .filter-btn.active {
+  background: white;
+  color: #4b5563;
+  box-shadow: 0 3px 10px rgba(31,40,55,0.08);
+}
+.filter-group .filter-btn:active {
+  transform: scale(0.97);
+}
+
+</style>
+</head>
+
+
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="logo">PDS</div>
+    <nav class="nav">
+      <button class="nav-btn active" data-page="dashboard" title="Dashboard">⌂</button>
+      <button class="nav-btn" data-page="plan" title="Plan">✦</button>
+      <button class="nav-btn" data-page="tasks" title="Tasks">✓</button>
+      <button class="nav-btn" data-page="do" title="Do">◷</button>
+      <button class="nav-btn" data-page="see" title="See">♡</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="nav-btn" data-page="settings" title="Settings">⚙</button>
+    </div>
+  </aside>
+
+
+  <main class="main">
+
+    <header class="top">
+      <div class="greeting">
+        <h1 id="greetingTitle">오늘도 하나씩 해볼까요?</h1>
+        <p id="greetingSubtitle">계획하고, 실행하고, 돌아보는 나만의 PDS Diary</p>
+      </div>
+      <div class="top-right">
+        <div class="date-chip" id="currentDate">2026년 9월 8일 · 화요일</div>
+        <div class="profile">P</div>
+      </div>
+    </header>
+
+    <div class="notice">
+      <span>지금은 로그인이 없어 링크를 아는 사람은 누구나 볼 수 있습니다. 남이 봐도 괜찮은 내용만 넣으세요.</span>
+      <button onclick="this.parentElement.remove()">닫기</button>
+    </div>
+
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <div class="dashboard">
+
+        <div class="left-column">
+          <section>
+            <div class="section-title">
+              <h2>오늘 할 일</h2>
+              <span>완료하면 카드가 사라져요</span>
+            </div>
+            <div class="plan-grid" id="dashboardPlanGrid"></div>
+          </section>
+
+          <section class="add-plan">
+            <div class="section-title">
+              <h2>새 계획</h2>
+              <span>오늘 할 일을 추가해보세요</span>
+            </div>
+            <div class="add-plan-form">
+              <input id="quickPlanTitle" class="input" maxlength="50" placeholder="예: 영어 단어 30개 외우기">
+              <select id="quickPlanColor" class="input">
+                <option value="mint">민트</option>
+                <option value="pink">핑크</option>
+                <option value="yellow">노랑</option>
+                <option value="purple">보라</option>
+                <option value="blue">파랑</option>
+                <option value="red">빨강</option>
+              </select>
+              <button class="btn btn-gray" onclick="quickAddPlan()">+ 추가</button>
+            </div>
+            <p style="margin-top:8px; color:#9a9fa7; font-size:10px; line-height:1.6;">
+              오늘 날짜로 계획과 할 일을 한 번에 만드는 빠른 추가예요. 나머지 값(기간·우선순위·성공 기준 등)은 기본값으로 채워져요.
+              기간이나 성공 기준까지 직접 정하고 싶다면 <strong style="color:#6b7280;">Plan 화면의 "계획 만들기"</strong>를 이용해주세요.
+            </p>
+          </section>
+
+          <section class="progress-panel">
+            <div class="section-title">
+              <h2>오늘의 진행 상황</h2>
+              <span>오늘 기준</span>
+            </div>
+            <div class="progress-cards">
+              <div class="progress-card mint" onclick="goTasks('all')" style="cursor:pointer">
+                <div class="label">오늘 계획</div>
+                <div class="value" id="dashboardPlanCount">0</div>
+              </div>
+              <div class="progress-card yellow" onclick="goTasks('done')" style="cursor:pointer">
+                <div class="label">완료</div>
+                <div class="value" id="dashboardDoneCount">0</div>
+              </div>
+              <div class="progress-card purple" onclick="showPage('see')" style="cursor:pointer">
+                <div class="label">진행률</div>
+                <div class="value" id="dashboardProgress">0%</div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="right-column">
+          <section class="calendar">
+            <div class="calendar-head">
+              <div class="calendar-month" id="calendarMonth">September 2026</div>
+              <div class="calendar-nav">
+                <button onclick="changeCalendarMonth(-1)">‹</button>
+                <button onclick="changeCalendarMonth(1)">›</button>
+              </div>
+            </div>
+            <div class="weekdays"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
+            <div class="days" id="calendarDays"></div>
+          </section>
+
+          <section class="selected-date">
+            <div class="small">SELECTED DATE</div>
+            <h3 id="selectedDate">9월 8일 화요일</h3>
+            <p id="selectedPlanCount">오늘 계획을 불러오는 중...</p>
+          </section>
+
+          <section class="see-panel">
+            <div class="section-title"><h2>돌아보기</h2><span>SEE</span></div>
+            <div class="see-item">
+              <div class="see-icon">T</div>
+              <div class="see-text"><strong>예상 vs 실제</strong><span id="miniTimeText">아직 실행 기록이 없어요.</span></div>
+            </div>
+            <div class="see-item">
+              <div class="see-icon">!</div>
+              <div class="see-text"><strong>막힘</strong><span id="miniBlockedText">막힌 기록을 확인해보세요.</span></div>
+            </div>
+            <div class="see-item">
+              <div class="see-icon">→</div>
+              <div class="see-text"><strong>다음 계획</strong><span id="miniNextText">돌아보기에서 개선점을 정해보세요.</span></div>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- PLAN -->
+    <section class="page" id="page-plan">
+      <div class="page-header">
+        <div class="page-title"><h2>Plan</h2><p>내가 세운 계획과 계획 수정 이력을 관리해요.</p></div>
+        <div class="page-actions"><button class="btn btn-gray" onclick="openPlanModal()">+ 계획 만들기</button></div>
+      </div>
+
+      <div class="plan-layout">
+        <div><div class="plan-list" id="planList"></div></div>
+        <div class="panel-stack">
+          <div class="panel">
+            <div class="section-title"><h3>계획 원칙</h3><span>PLAN</span></div>
+            <p style="color:#777e88;font-size:11px;line-height:1.8;">계획에는 기간, 우선순위, 성공 기준, 예상 시간을 남겨요. 계획을 수정해도 처음 세운 내용은 이력으로 보존됩니다.</p>
+          </div>
+          <div class="panel">
+            <div class="section-title"><h3>다음 계획으로</h3><span>SEE → PLAN</span></div>
+            <div id="nextPlanBox" style="color:#777e88;font-size:11px;line-height:1.7;">아직 전달된 개선점이 없습니다.</div>
+            <div class="form-actions" style="margin-top:12px;">
+              <button class="btn btn-gray btn-small" onclick="createPlanFromNextPlan()">이 내용으로 새 계획 만들기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- TASKS -->
+    <section class="page" id="page-tasks">
+      <div class="page-header">
+        <div class="page-title"><h2>Tasks</h2><p>할 일을 만들고, 찾고, 완료하고, 다시 되돌려보세요.</p></div>
+        <div class="page-actions"><button class="btn btn-gray" onclick="openTaskModal()">+ 할 일 추가</button></div>
+      </div>
+
+      <div class="task-toolbar task-toolbar-4col">
+        <input id="taskSearch" class="input search" placeholder="할 일 검색..." oninput="renderTasks()">
+        <select id="taskFilter" class="input" onchange="renderTasks()">
+          <option value="all">전체 상태</option>
+          <option value="todo">진행 중</option>
+          <option value="done">완료</option>
+          <option value="delay">지연</option>
+          <option value="blocked">막힘</option>
+        </select>
+        <select id="taskSort" class="input" onchange="renderTasks()">
+          <option value="created">생성 순</option>
+          <option value="priority">우선순위</option>
+          <option value="deadline">마감일</option>
+          <option value="estimate">예상 시간</option>
+        </select>
+        <select id="taskPlanFilter" class="input" onchange="renderTasks()">
+          <option value="all">전체 계획</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+        <div class="filter-group">
+          <button class="filter-btn active" data-task-view="list" onclick="setTaskViewMode('list')" title="목록으로 보기"><span>목록</span></button>
+          <button class="filter-btn" data-task-view="date" onclick="setTaskViewMode('date')" title="날짜별로 보기"><span>날짜별</span></button>
+          <button class="filter-btn" data-task-view="month" onclick="setTaskViewMode('month')" title="월별로 보기"><span>월별</span></button>
+        </div>
+      </div>
+
+      <div id="taskSortNotice" style="color:#8b919a;font-size:10px;margin:0 2px 10px;">정렬 기준: 생성 순 · 값이 같으면 ID가 작은 순</div>
+
+      <div class="task-list" id="taskList"></div>
+    </section>
+
+
+    <!-- DO -->
+    <section class="page" id="page-do">
+      <div class="page-header">
+        <div class="page-title"><h2>Do</h2><p>계획이 아니라 실제로 한 일을 기록해요.</p></div>
+      </div>
+
+      <div class="do-layout">
+        <div class="panel">
+          <div class="section-title"><h3>실제로 한 일 기록</h3><span>DO</span></div>
+
+          <form class="execution-form" onsubmit="saveExecution(event)">
+            <div class="form-group">
+              <label class="form-label">계획으로 좁혀보기</label>
+              <select id="executionTaskPlanFilter" class="input" onchange="renderExecutionTaskOptions()">
+                <option value="all">전체 계획</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">할 일</label>
+              <select id="executionTask" class="input" required></select>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">시작 시각</label>
+                <input id="executionStart" class="input" type="datetime-local" required onchange="recalcExecutionMinutes()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">끝난 시각</label>
+                <input id="executionEnd" class="input" type="datetime-local" required onchange="recalcExecutionMinutes()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">실제 시간 (분) — 자동 계산됨</label>
+                <input id="executionMinutes" class="input" type="number" min="0" max="1440" placeholder="예: 60" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">막혔던 이유</label>
+                <input id="executionBlocked" class="input" maxlength="80" placeholder="없다면 비워두세요">
+              </div>
+              <div class="form-group full">
+                <label class="form-label">메모</label>
+                <textarea id="executionMemo" class="input" maxlength="300" placeholder="실제로 무엇을 했는지 적어보세요."></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions"><button class="btn btn-gray" type="submit">실행 기록 저장</button></div>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="section-title"><h3>기록 원칙</h3><span>PLAN ≠ DO</span></div>
+          <p style="color:#777e88;font-size:11px;line-height:1.8;">
+            실제 실행 기록은 원래 계획을 덮어쓰지 않습니다.
+            <br><br>
+            예상 시간은 Plan에 그대로 남고, 실제 걸린 시간은 Do 기록에 따로 저장됩니다.
+            <br><br>
+            같은 완료 요청이 두 번 들어오더라도 하나의 완료 기록만 남도록 관리합니다.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel execution-records">
+        <div class="section-title">
+          <h3>실행 기록</h3>
+          <select id="doPlanFilter" class="input" style="width:auto;height:32px;font-size:10px;" onchange="renderExecutions()">
+            <option value="all">전체 계획</option>
+          </select>
+        </div>
+        <div class="execution-list" id="executionList"></div>
+      </div>
+    </section>
+
+
+    <!-- SEE -->
+    <section class="page" id="page-see">
+      <div class="page-header">
+        <div class="page-title"><h2>See</h2><p>예상과 실제의 차이를 보고 다음 계획으로 연결해요.</p></div>
+        <select id="seePlanSelect" class="input" style="width:220px" onchange="onSeePlanChange()"></select>
+      </div>
+
+      <div id="seeEmptyState" class="empty-state hidden"><strong>아직 계획이 없어요.</strong><p>Plan 화면에서 계획을 먼저 만들어보세요.</p></div>
+
+      <div id="seeContent">
+      <div class="see-summary">
+        <div class="summary-card mint" onclick="goTasks('all')" style="cursor:pointer">
+          <div class="summary-label">계획 수</div><div class="summary-value" id="seePlanCount">0</div>
+        </div>
+        <div class="summary-card green" onclick="goTasks('done')" style="cursor:pointer">
+          <div class="summary-label">완료 수</div><div class="summary-value" id="seeDoneCount">0</div>
+        </div>
+        <div class="summary-card red" onclick="goTasks('delay')" style="cursor:pointer">
+          <div class="summary-label">지연 수</div><div class="summary-value" id="seeDelayCount">0</div>
+        </div>
+        <div class="summary-card orange" onclick="goTasks('blocked')" style="cursor:pointer">
+          <div class="summary-label">막힘 수</div><div class="summary-value" id="seeBlockedCount">0</div>
+        </div>
+      </div>
+
+      <div class="see-grid">
+        <div class="panel">
+          <div class="section-title"><h3>예상 시간 vs 실제 시간</h3><span>단위: 분 · 숫자를 누르면 실행 기록으로 이동</span></div>
+
+          <div class="time-compare">
+            <div class="time-row" onclick="goExecutions()" style="cursor:pointer">
+              <div class="time-row-label">예상</div>
+              <div class="time-bar"><div class="time-fill estimate" id="estimateBar" style="width:0%"></div></div>
+              <div class="time-number" id="estimateTotal">0분</div>
+            </div>
+            <div class="time-row" onclick="goExecutions()" style="cursor:pointer">
+              <div class="time-row-label">실제</div>
+              <div class="time-bar"><div class="time-fill actual" id="actualBar" style="width:0%"></div></div>
+              <div class="time-number" id="actualTotal">0분</div>
+            </div>
+            <div onclick="goExecutions()" style="background:#f7f8f9;padding:14px;border-radius:15px;font-size:11px;color:#727984;cursor:pointer;">
+              차이: <strong id="timeDifference" style="color:#59606a">0분</strong>
+              <br>
+              실제 시간이 예상보다 오래 걸렸다면 +로 표시됩니다. 눌러서 실행 기록을 확인하세요.
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title"><h3>이번 돌아보기</h3><span>INSIGHT</span></div>
+          <div class="insight">
+            <small>오늘 발견한 개선점</small>
+            <h3 id="insightTitle">아직 기록이 없어요.</h3>
+            <p id="insightText">실행 기록을 남기면 예상과 실제의 차이를 바탕으로 돌아볼 수 있어요.</p>
+          </div>
+
+          <div style="margin-top:14px">
+            <label class="form-label">다음 계획으로 넘길 한 줄</label>
+            <textarea id="nextPlanInput" class="input" style="margin-top:7px;height:85px" maxlength="150" placeholder="예: 다음에는 계획 시간에 10분의 여유를 둔다."></textarea>
+            <div class="form-actions"><button class="btn btn-gray" onclick="saveNextPlan()">다음 계획으로 넘기기</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:20px">
+        <div class="section-title"><h3>집계 근거 기록</h3><span>숫자를 누르면 이곳에서 확인할 수 있어요</span></div>
+        <div id="seeEvidence"></div>
+      </div>
+      </div>
+    </section>
+
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <div class="page-header">
+        <div class="page-title"><h2>Settings</h2><p>데이터와 공개 상태를 확인해요.</p></div>
+      </div>
+
+      <div class="settings-grid">
+        <div class="setting-card">
+          <h3>데이터 내보내기</h3>
+          <p>현재 계획, 할 일, 실행 기록, 수정 이력, 돌아보기 데이터를 JSON 파일 하나로 내보냅니다.</p>
+          <div class="setting-buttons"><button class="btn btn-gray" onclick="exportData()">JSON 내보내기</button></div>
+        </div>
+
+        <div class="setting-card">
+          <h3>현재 저장 상태</h3>
+          <p id="storageStatus">브라우저에 저장되어 있습니다.</p>
+          <div class="warning-box">이 버전은 Supabase(Postgres) 서버 데이터베이스에 연결되어 있습니다.<br><br>새로고침해도, 다른 사람이 같은 링크로 들어와도 같은 데이터가 보입니다.</div>
+        </div>
+
+        <div class="setting-card">
+          <h3>공개 상태</h3>
+          <p>로그인 기능이 없기 때문에 링크를 아는 사람은 누구나 현재 데이터를 볼 수 있습니다.</p>
+          <div class="warning-box">남이 봐도 괜찮은 내용만 기록하세요. 다른 사람의 이름, 연락처 등 개인정보는 넣지 않는 것을 권장합니다.</div>
+        </div>
+
+        <div class="setting-card">
+          <h3>테스트 데이터</h3>
+          <p>과제를 처음부터 다시 테스트하고 싶다면 서버에 저장된 데이터를 초기화할 수 있습니다.</p>
+          <div class="setting-buttons"><button class="btn btn-danger" onclick="resetData()">전체 데이터 초기화</button></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+</div>
+
+
+<!-- PLAN MODAL -->
+<div class="modal-overlay" id="planModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="planModalTitle">새로운 계획</h3><button class="modal-close" onclick="closeModal('planModal')">×</button></div>
+    <form onsubmit="savePlan(event)">
+      <input type="hidden" id="editPlanId">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">계획 이름 (최대 50자)</label><input id="planTitle" class="input" required maxlength="50" placeholder="예: 자격증 시험 준비 끝내기"></div>
+        <div class="form-group full"><label class="form-label">설명</label><textarea id="planDescription" class="input" maxlength="200" placeholder="무엇을 성공시키고 싶은지 적어보세요."></textarea></div>
+        <div class="form-group"><label class="form-label">시작일</label><input id="planStart" class="input" type="date" required></div>
+        <div class="form-group"><label class="form-label">종료일</label><input id="planEnd" class="input" type="date" required></div>
+        <div class="form-group">
+          <label class="form-label">우선순위</label>
+          <select id="planPriority" class="input"><option value="high">높음</option><option value="medium" selected>보통</option><option value="low">낮음</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">예상 시간 (분, 최대 9999)</label><input id="planEstimate" class="input" type="number" min="0" max="9999" required placeholder="예: 60"></div>
+        <div class="form-group full"><label class="form-label">성공 기준 (최대 80자)</label><input id="planSuccess" class="input" required maxlength="80" placeholder="예: 목표한 범위까지 공부를 마친다."></div>
+        <div class="form-group full">
+          <label class="form-label">카드 색상</label>
+          <div class="color-options">
+            <button type="button" class="color-option mint selected" data-color="mint" onclick="selectPlanColor('mint')"></button>
+            <button type="button" class="color-option pink" data-color="pink" onclick="selectPlanColor('pink')"></button>
+            <button type="button" class="color-option yellow" data-color="yellow" onclick="selectPlanColor('yellow')"></button>
+            <button type="button" class="color-option purple" data-color="purple" onclick="selectPlanColor('purple')"></button>
+            <button type="button" class="color-option blue" data-color="blue" onclick="selectPlanColor('blue')"></button>
+            <button type="button" class="color-option red" data-color="red" onclick="selectPlanColor('red')"></button>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-light" onclick="closeModal('planModal')">취소</button>
+        <button type="submit" class="btn btn-gray">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <div class="modal-head"><h3>할 일 추가</h3><button class="modal-close" onclick="closeModal('taskModal')">×</button></div>
+    <form onsubmit="saveTask(event)">
+      <input type="hidden" id="editTaskId">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">할 일 (최대 50자)</label><input id="taskTitle" class="input" required maxlength="50" placeholder="예: 문제집 1단원 풀기"></div>
+        <div class="form-group"><label class="form-label">계획</label><select id="taskPlan" class="input" required onchange="applyPlanDateRangeToTaskDeadline()"></select></div>
+        <div class="form-group">
+          <label class="form-label">우선순위</label>
+          <select id="taskPriority" class="input"><option value="high">높음</option><option value="medium" selected>보통</option><option value="low">낮음</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">마감일 (계획 기간 안에서만)</label><input id="taskDeadline" class="input" type="date" required></div>
+        <div class="form-group"><label class="form-label">예상 시간 (분, 최대 1440)</label><input id="taskEstimate" class="input" type="number" min="0" max="1440" required placeholder="예: 60"></div>
+        <div class="form-group full"><label class="form-label">태그 (최대 15자)</label><input id="taskTag" class="input" maxlength="15" placeholder="예: 공부"></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-light" onclick="closeModal('taskModal')">취소</button>
+        <button type="submit" class="btn btn-gray">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- TASK DETAIL MODAL (긴 제목 "자세히" 보기) -->
+<div class="modal-overlay" id="taskDetailModal">
+  <div class="modal">
+    <div class="modal-head" style="align-items:flex-start;">
+      <div style="min-width:0; flex:1;">
+        <div style="font-size:11px; font-weight:700; color:var(--sub); letter-spacing:0.5px;">할 일 상세</div>
+        <div style="display:flex; align-items:flex-start; gap:6px; margin-top:6px;">
+          <div id="taskDetailTitle" class="clamped" style="flex:1; min-width:0; font-size:19px; font-weight:800; color:#20242c; line-height:1.35; word-break:break-word;"></div>
+          <button id="taskDetailToggle" class="icon-btn" style="display:none; align-items:center; justify-content:center; flex-shrink:0; width:26px; height:26px; transition: transform 0.2s;" onclick="toggleClampedText('taskDetailTitle','taskDetailToggle')" title="펼쳐보기">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:5px; margin-top:4px;">
+          <div id="taskDetailPlanName" class="clamped" style="flex:1; min-width:0; font-size:11px; color:var(--sub); word-break:break-word;"></div>
+          <button id="taskDetailPlanToggle" class="icon-btn" style="display:none; align-items:center; justify-content:center; flex-shrink:0; width:18px; height:18px; background:transparent; color:var(--sub); border-radius:6px; transition: transform 0.2s;" onclick="toggleClampedText('taskDetailPlanName','taskDetailPlanToggle')" title="펼쳐보기">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('taskDetailModal')">×</button>
+    </div>
+    <div id="taskDetailBody" style="font-size:12px; color:#4b5563; line-height:1.7;"></div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-light" onclick="closeModal('taskDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- PLAN TIMELINE MODAL -->
+<div class="modal-overlay" id="planTimelineModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="planTimelineTitle">계획 타임라인</h3><button class="modal-close" onclick="closeModal('planTimelineModal')">×</button></div>
+    <div id="planTimelineBody"></div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-light" onclick="closeModal('planTimelineModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+/* =====================================================
+   PDS Diary — Supabase 연동판
+   서버 데이터베이스(Postgres)에서 직접 읽고 쓴다
+===================================================== */
+
+/* Supabase 프로젝트 생성 후, 반드시 아래 두 값을 실제 값으로 바꿔주세요 (supabase/README.md 참고) */
+/* SUPABASE_ANON_KEY는 "publishable key"(sb_publishable_... 형태)를 넣으세요.
+   RLS(Row Level Security)가 켜져 있는 한 브라우저 코드에 그대로 노출돼도 안전한 키입니다.
+   절대 넣으면 안 되는 건 "secret key"(sb_secret_... 형태, 구 service_role 키)입니다 — 이건 RLS를 무시하고 DB 전체에 접근할 수 있어서 서버에서만 써야 합니다. */
+const SUPABASE_URL = "https://fqewmaycngfvcynhvjxx.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_GUBjOayaFjjgFOFgqmu9pw_puBvwHLH"; // publishable key(sb_publishable_...)를 넣으세요, secret key 금지
+const SEOUL_TZ = "Asia/Seoul";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function throwIfError(error) {
+  if (error) throw new Error(error.code === "23505" ? "동일한 실행 기록이 이미 존재합니다." : error.message);
+}
+
+/* DB 행(snake_case) → 화면에서 쓰는 형태(camelCase) 변환 */
+function mapPlanRow(r) {
+  return { id: r.id, title: r.title, description: r.description, startDate: r.start_date, endDate: r.end_date,
+    priority: r.priority, success: r.success, estimatedMinutes: r.estimated_minutes, color: r.color,
+    createdAt: r.created_at, updatedAt: r.updated_at };
+}
+function mapTaskRow(r) {
+  return { id: r.id, planId: r.plan_id, title: r.title, priority: r.priority, deadline: r.deadline, tag: r.tag,
+    estimatedMinutes: r.estimated_minutes, status: r.status, createdAt: r.created_at, completedAt: r.completed_at };
+}
+function mapExecutionRow(r) {
+  return { id: r.id, taskId: r.task_id, start: r.start_time, end: r.end_time, actualMinutes: r.actual_minutes,
+    blockedReason: r.blocked_reason, memo: r.memo, completion: r.completion, createdAt: r.created_at };
+}
+
+let data = { plans: [], tasks: [], executions: [], nextPlan: "" };
+let selectedCalendarDate = new Date();
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let selectedPlanColor = "mint";
+let currentTaskFilter = "all";
+let taskViewMode = "list";
+let expandedTaskDates = new Set(); // 날짜별 보기에서 펼쳐진 날짜들
+let taskDateGroupsSeen = new Set(); // 기본 펼침 상태를 한 번만 적용하기 위한 추적용
+let expandedTaskMonths = new Set(); // 월별 보기에서 펼쳐진 달들
+let taskMonthGroupsSeen = new Set();
+let selectedSeePlanId = null;
+
+
+/* 서울 시간대 유틸 */
+function seoulTodayString() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: SEOUL_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+
+/* 서버에서 전체 데이터를 다시 불러온다 */
+async function refreshAll() {
+  const [plansRes, tasksRes, execRes, npRes] = await Promise.all([
+    sb.from("plans").select("*").order("id"),
+    sb.from("tasks").select("*").order("id"),
+    sb.from("executions").select("*").order("id"),
+    sb.from("next_plan").select("text").eq("id", 1).single()
+  ]);
+  throwIfError(plansRes.error);
+  throwIfError(tasksRes.error);
+  throwIfError(execRes.error);
+  throwIfError(npRes.error);
+
+  data.plans = plansRes.data.map(mapPlanRow);
+  data.tasks = tasksRes.data.map(mapTaskRow);
+  data.executions = execRes.data.map(mapExecutionRow);
+  data.nextPlan = npRes.data?.text || "";
+}
+
+/* 상단 날짜 칩 — 서울 시간 기준 오늘 날짜로 갱신 */
+function updateCurrentDateChip() {
+  const el = document.getElementById("currentDate");
+  if (!el) return;
+  const [y, m, d] = seoulTodayString().split("-").map(Number);
+  const weekday = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"][new Date(y, m - 1, d).getDay()];
+  el.textContent = `${y}년 ${m}월 ${d}일 · ${weekday}`;
+}
+
+function renderCurrentPage() {
+  updateCurrentDateChip();
+  renderDashboard(); renderPlans(); renderTasks();
+  renderExecutionTaskOptions(); renderExecutions(); renderSee();
+  updateStorageStatus();
+}
+
+async function refreshAndRender() {
+  await refreshAll();
+  renderCurrentPage();
+}
+
+
+/* Navigation */
+function showPage(pageName) {
+  document.querySelectorAll(".page").forEach(page => page.classList.remove("active"));
+  const page = document.getElementById(`page-${pageName}`);
+  if (page) page.classList.add("active");
+  document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.page === pageName));
+
+  if (pageName === "dashboard") renderDashboard();
+  if (pageName === "plan") renderPlans();
+  if (pageName === "tasks") {
+    document.getElementById("taskSearch").value = "";
+    document.getElementById("taskFilter").value = "all";
+    populateTaskPlanFilterOptions();
+    document.getElementById("taskPlanFilter").value = "all";
+    renderTasks();
+  }
+  if (pageName === "do") { renderExecutionTaskOptions(); renderExecutions(); }
+  if (pageName === "see") renderSee();
+  if (pageName === "settings") updateStorageStatus();
+}
+document.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => showPage(btn.dataset.page)));
+
+
+/* Dashboard */
+function renderDashboard() {
+  const selectedDate = formatDateInput(selectedCalendarDate);
+  const todayTasks = data.tasks.filter(task => task.deadline === selectedDate);
+  const todoTasks = todayTasks.filter(task => task.status !== "done");
+  const doneTasks = todayTasks.filter(task => task.status === "done");
+
+  // 선택한 날짜가 기간에 포함되는데 할 일이 하나도 없는 계획
+  const emptyPlans = data.plans.filter(plan =>
+    plan.startDate <= selectedDate &&
+    plan.endDate >= selectedDate &&
+    !data.tasks.some(task => task.planId === plan.id)
+  );
+
+  const grid = document.getElementById("dashboardPlanGrid");
+  grid.innerHTML = "";
+
+  todoTasks.forEach(task => {
+    const plan = data.plans.find(p => p.id === task.planId);
+    const color = plan ? plan.color : "mint";
+    const card = document.createElement("article");
+    card.className = `plan-card ${color}`;
+    card.innerHTML = `
+      <div class="plan-card-head">
+        <span class="category">${escapeHTML(task.tag || "TODAY")}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="detail-link" style="display:none;" onclick="openTaskDetailModal(${task.id})">자세히</button>
+          <span class="priority">${priorityText(task.priority)}</span>
+        </div>
+      </div>
+      <h3>${escapeHTML(task.title)}</h3>
+      <p>${plan ? escapeHTML(plan.title) : "계획 없음"}</p>
+      <div class="plan-bottom">
+        <span class="plan-time">예상 ${formatMinutes(task.estimatedMinutes)}</span>
+        <button class="complete-btn" onclick="markTaskDone(${task.id})" title="완료">✓</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  if (todoTasks.length && emptyPlans.length) {
+    const divider = document.createElement("div");
+    divider.style.cssText = "grid-column: 1 / -1; margin: 6px 0 -2px; display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; color: var(--sub); letter-spacing:0.3px;";
+    divider.innerHTML = `<span>할 일이 아직 없는 계획</span><span style="flex:1; height:1px; background:var(--line);"></span>`;
+    grid.appendChild(divider);
+  }
+
+  emptyPlans.forEach(plan => {
+    const card = document.createElement("article");
+    card.className = `plan-card ${plan.color}`;
+    card.style.border = "2px dashed rgba(30,35,40,0.18)";
+    card.innerHTML = `
+      <div class="plan-card-head">
+        <span class="priority" style="background: rgba(255,255,255,0.85);">계획 · 할 일 없음</span>
+      </div>
+      <h3>${escapeHTML(plan.title)}</h3>
+      <p>이 계획엔 아직 할 일이 하나도 없어요</p>
+      <div class="plan-bottom">
+        <span class="plan-time">할 일을 추가해보세요</span>
+        <button class="complete-btn" onclick="openTaskModalForPlan(${plan.id})" title="할 일 추가">+</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  if (!todoTasks.length && !emptyPlans.length) {
+    const message = todayTasks.length
+      ? { title: "오늘 할 일을 모두 완료했어요!", text: "새로운 계획을 추가하거나 돌아보기를 확인해보세요." }
+      : { title: "오늘 할 일이 없어요.", text: "Plan 화면에서 계획을 만들거나, 위 새 계획으로 바로 추가해보세요." };
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><strong>${message.title}</strong><p>${message.text}</p></div>`;
+  } else {
+    // 실제로 말줄임(...)이 적용된 카드에만 "자세히" 버튼을 보여준다
+    grid.querySelectorAll(".plan-card").forEach(card => {
+      const h3 = card.querySelector("h3");
+      const p = card.querySelector("p");
+      const link = card.querySelector(".detail-link");
+      if (!h3 || !link) return;
+      const overflowing = h3.scrollWidth > h3.clientWidth + 1 || (p && p.scrollWidth > p.clientWidth + 1);
+      link.style.display = overflowing ? "inline-block" : "none";
+    });
+  }
+
+  document.getElementById("dashboardPlanCount").textContent = todayTasks.length;
+  document.getElementById("dashboardDoneCount").textContent = doneTasks.length;
+
+  const progress = todayTasks.length === 0 ? 0 : Math.round((doneTasks.length / todayTasks.length) * 100);
+  document.getElementById("dashboardProgress").textContent = `${progress}%`;
+
+  const weekday = ["일요일","월요일","화요일","수요일","목요일","금요일","토요일"][selectedCalendarDate.getDay()];
+  document.getElementById("selectedDate").textContent = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일 ${weekday}`;
+  document.getElementById("selectedPlanCount").textContent = `이 날짜의 할 일 ${todayTasks.length}개 · 완료 ${doneTasks.length}개`;
+
+  renderCalendar();
+
+  const actual = data.executions.filter(e => !e.completion).reduce((sum, item) => sum + Number(item.actualMinutes || 0), 0);
+  const estimate = data.tasks.reduce((sum, item) => sum + Number(item.estimatedMinutes || 0), 0);
+
+  document.getElementById("miniTimeText").textContent = data.executions.some(e => !e.completion) ? `예상 ${estimate}분 · 실제 ${actual}분` : "아직 실행 기록이 없어요.";
+
+  const blocked = data.executions.filter(item => item.blockedReason && item.blockedReason.trim()).length;
+  document.getElementById("miniBlockedText").textContent = `${blocked}개의 실행 기록에 막힘 이유가 있어요.`;
+  document.getElementById("miniNextText").textContent = data.nextPlan ? data.nextPlan : "돌아보기에서 개선점을 정해보세요.";
+}
+
+
+/* Quick Add Plan */
+async function quickAddPlan() {
+  const title = document.getElementById("quickPlanTitle").value.trim();
+  const color = document.getElementById("quickPlanColor").value;
+  if (!title) { showToast("계획 이름을 입력해주세요."); return; }
+
+  const dateStr = formatDateInput(selectedCalendarDate);
+
+  try {
+    const { data: planRow, error: e1 } = await sb.from("plans").insert({
+      title, description: "오늘 추가한 계획",
+      start_date: dateStr, end_date: dateStr,
+      priority: "medium", success: "계획한 내용을 완료한다.",
+      estimated_minutes: 60, color
+    }).select().single();
+    throwIfError(e1);
+
+    const { error: e2 } = await sb.from("tasks").insert({
+      plan_id: planRow.id, title, priority: "medium",
+      deadline: dateStr, tag: "", estimated_minutes: 60
+    });
+    throwIfError(e2);
+
+    document.getElementById("quickPlanTitle").value = "";
+    await refreshAndRender();
+    showToast("새 계획이 추가되었습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Plan Modal */
+function openPlanModal(planId = null) {
+  document.getElementById("planModal").classList.add("open");
+  document.getElementById("editPlanId").value = planId || "";
+
+  if (planId) {
+    const plan = data.plans.find(p => p.id === Number(planId));
+    if (!plan) return;
+    document.getElementById("planModalTitle").textContent = "계획 수정";
+    document.getElementById("planTitle").value = plan.title;
+    document.getElementById("planDescription").value = plan.description;
+    document.getElementById("planStart").value = plan.startDate;
+    document.getElementById("planEnd").value = plan.endDate;
+    document.getElementById("planPriority").value = plan.priority;
+    document.getElementById("planEstimate").value = plan.estimatedMinutes;
+    document.getElementById("planSuccess").value = plan.success;
+    selectPlanColor(plan.color);
+  } else {
+    document.getElementById("planModalTitle").textContent = "새로운 계획";
+    document.getElementById("planTitle").value = "";
+    document.getElementById("planDescription").value = "";
+    document.getElementById("planStart").value = formatDateInput(selectedCalendarDate);
+    document.getElementById("planEnd").value = formatDateInput(selectedCalendarDate);
+    document.getElementById("planPriority").value = "medium";
+    document.getElementById("planEstimate").value = 60;
+    document.getElementById("planSuccess").value = "";
+    selectPlanColor("mint");
+  }
+}
+
+function selectPlanColor(color) {
+  selectedPlanColor = color;
+  document.querySelectorAll(".color-option").forEach(btn => btn.classList.toggle("selected", btn.dataset.color === color));
+}
+
+async function savePlan(event) {
+  event.preventDefault();
+  const id = document.getElementById("editPlanId").value;
+  const title = document.getElementById("planTitle").value.trim();
+  const description = document.getElementById("planDescription").value.trim();
+  const startDate = document.getElementById("planStart").value;
+  const endDate = document.getElementById("planEnd").value;
+  const priority = document.getElementById("planPriority").value;
+  const estimatedMinutes = Number(document.getElementById("planEstimate").value);
+  const success = document.getElementById("planSuccess").value.trim();
+
+  if (!title) { showToast("계획 이름을 입력해주세요."); return; }
+  if (endDate < startDate) { showToast("종료일은 시작일보다 빠를 수 없습니다."); return; }
+  if (estimatedMinutes < 0 || estimatedMinutes > 9999 || Number.isNaN(estimatedMinutes)) { showToast("예상 시간은 0~9999분 사이로 입력해주세요."); return; }
+
+  const payload = {
+    title, description, start_date: startDate, end_date: endDate, priority, success,
+    estimated_minutes: estimatedMinutes, color: selectedPlanColor
+  };
+
+  try {
+    let newPlanId = null;
+
+    if (id) {
+      // 수정 전 스냅샷을 history에 먼저 보존 (T06-C08)
+      const { data: current, error: e0 } = await sb.from("plans").select("*").eq("id", id).single();
+      throwIfError(e0);
+      throwIfError((await sb.from("plan_history").insert({ plan_id: id, previous_json: current })).error);
+      throwIfError((await sb.from("plans").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", id)).error);
+      showToast("계획이 수정되었습니다. 이전 내용도 이력에 남았습니다.");
+    } else {
+      const { data: newPlan, error } = await sb.from("plans").insert(payload).select().single();
+      throwIfError(error);
+      newPlanId = newPlan.id;
+      showToast("계획이 생성되었습니다. 이어서 할 일을 추가해보세요.");
+    }
+
+    closeModal("planModal");
+    await refreshAndRender();
+
+    // 새로 만든 계획이면, 그 계획이 미리 선택된 할 일 추가 창을 곧바로 이어서 띄운다
+    if (newPlanId != null) {
+      openTaskModalForPlan(newPlanId);
+    }
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Plan List */
+/* 계획 기간 관련 헬퍼 */
+function planDDayLabel(plan) {
+  const today = seoulTodayString();
+  const diffDays = Math.round((new Date(plan.endDate) - new Date(today)) / 86400000);
+  if (diffDays > 0) return `D-${diffDays}`;
+  if (diffDays === 0) return "D-DAY";
+  return `D+${Math.abs(diffDays)}`;
+}
+function planPeriodProgress(plan) {
+  const today = seoulTodayString();
+  const start = new Date(plan.startDate);
+  const end = new Date(plan.endDate);
+  const now = new Date(today);
+  const total = Math.max(1, end - start);
+  const elapsed = Math.min(total, Math.max(0, now - start));
+  return Math.round((elapsed / total) * 100);
+}
+
+function renderPlans() {
+  const list = document.getElementById("planList");
+  list.innerHTML = "";
+
+  if (!data.plans.length) { list.innerHTML = emptyHTML("아직 계획이 없어요.", "새로운 계획을 만들어보세요."); return; }
+
+  data.plans.forEach(plan => {
+    const taskCount = data.tasks.filter(task => task.planId === plan.id).length;
+    const doneCount = data.tasks.filter(task => task.planId === plan.id && task.status === "done").length;
+    const dDay = planDDayLabel(plan);
+    const progress = planPeriodProgress(plan);
+    const dDayColor = dDay.startsWith("D+") ? "var(--red-dark)" : (dDay === "D-DAY" ? "var(--yellow-dark)" : "var(--sub)");
+
+    const card = document.createElement("div");
+    card.className = "plan-list-card";
+    card.innerHTML = `
+      <div class="plan-color ${plan.color}"></div>
+      <div class="plan-info">
+        <div class="meta">${formatDate(plan.startDate)} ~ ${formatDate(plan.endDate)} · ${priorityText(plan.priority)} · <span style="font-weight:700; color:${dDayColor};">${dDay}</span></div>
+        <h3>${escapeHTML(plan.title)}</h3>
+        <p>${escapeHTML(plan.success)} · 할 일 ${doneCount}/${taskCount}</p>
+        <div style="margin-top:8px; height:5px; background:#f0f1f2; border-radius:3px; overflow:hidden;" title="계획 기간 ${progress}% 경과">
+          <div style="width:${progress}%; height:100%; background:var(--${plan.color}-dark); border-radius:3px;"></div>
+        </div>
+      </div>
+      <div class="plan-card-actions">
+        <button class="icon-btn" title="타임라인" onclick="openPlanTimeline(${plan.id})">▤</button>
+        <button class="icon-btn" title="수정" onclick="openPlanModal(${plan.id})">✎</button>
+        <button class="icon-btn" title="이력" onclick="showPlanHistory(${plan.id})">↺</button>
+        <button class="icon-btn" title="삭제" onclick="deletePlan(${plan.id})">×</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  renderNextPlan();
+}
+
+
+/* Plan Delete — plan_history/tasks/executions는 ON DELETE CASCADE로 함께 삭제됨 */
+async function deletePlan(planId) {
+  const plan = data.plans.find(p => p.id === planId);
+  if (!plan) return;
+  if (!confirm(`"${plan.title}" 계획을 삭제할까요?\n연결된 할 일과 실행 기록도 삭제됩니다.`)) return;
+
+  try {
+    throwIfError((await sb.from("plans").delete().eq("id", planId)).error);
+    await refreshAndRender();
+    showToast("계획이 삭제되었습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Plan History (서버에서 조회) */
+async function showPlanHistory(planId) {
+  const plan = data.plans.find(p => p.id === planId);
+  if (!plan) return;
+
+  let rows;
+  try {
+    const res = await sb.from("plan_history").select("changed_at, previous_json").eq("plan_id", planId).order("id");
+    throwIfError(res.error);
+    rows = res.data;
+  } catch (e) {
+    showToast(e.message);
+    return;
+  }
+
+  if (!rows.length) { alert("아직 수정 이력이 없습니다."); return; }
+
+  let text = `「${plan.title}」 수정 이력\n\n`;
+  rows.forEach((item, index) => {
+    const prev = item.previous_json;
+    text += `${index + 1}. ${formatDateTime(item.changed_at)}\n`;
+    text += `제목: ${prev.title}\n`;
+    text += `기간: ${prev.start_date} ~ ${prev.end_date}\n`;
+    text += `우선순위: ${priorityText(prev.priority)}\n`;
+    text += `예상: ${prev.estimated_minutes}분\n`;
+    text += `성공 기준: ${prev.success}\n\n`;
+  });
+  alert(text);
+}
+
+
+/* Plan Timeline — 계획 기간 안에 할 일 마감일이 어떻게 분포돼 있는지 시각화 */
+function openPlanTimeline(planId) {
+  const plan = data.plans.find(p => p.id === planId);
+  if (!plan) return;
+
+  const tasks = data.tasks
+    .filter(t => t.planId === planId)
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+  document.getElementById("planTimelineTitle").textContent = `${plan.title} 타임라인`;
+
+  const start = new Date(plan.startDate);
+  const end = new Date(plan.endDate);
+  const isSingleDay = plan.startDate === plan.endDate;
+  const totalMs = Math.max(1, end - start);
+  const toPos = (d) => isSingleDay ? 50 : 4 + (Math.min(100, Math.max(0, ((d - start) / totalMs) * 100)) / 100) * 92; // 4~96% 안쪽으로, 하루짜리는 중앙 고정
+
+  // 같은 마감일끼리 묶어서, 겹치지 않게 세로로 펼쳐 배치한다
+  const dateGroups = {};
+  tasks.forEach(t => { (dateGroups[t.deadline] = dateGroups[t.deadline] || []).push(t); });
+
+  const dots = tasks.map(t => {
+    const group = dateGroups[t.deadline];
+    const idxInGroup = group.indexOf(t);
+    const groupSize = group.length;
+    const pos = toPos(new Date(t.deadline));
+    // 같은 날짜에 여러 개면 세로 20~80% 구간에 고르게, 하나뿐이면 가운데(50%) — 가로 위치는 날짜를 정확히 나타내야 하므로 항상 동일하게 유지
+    const rowTop = groupSize > 1 ? `${20 + (idxInGroup / (groupSize - 1)) * 60}%` : "50%";
+    const dotColor = t.status === "done" ? "var(--mint-dark)" : (isTaskDelayed(t) ? "var(--red-dark)" : "var(--blue-dark)");
+    return `<div onclick="highlightTimelineTask(${t.id})" title="${escapeHTML(t.title)} · ${formatDate(t.deadline)} (눌러서 아래서 확인)" style="position:absolute; left:${pos}%; top:${rowTop}; transform:translate(-50%,-50%); width:12px; height:12px; border-radius:50%; background:${dotColor}; border:2px solid white; box-shadow:0 0 0 1px rgba(0,0,0,.1); cursor:pointer;"></div>`;
+  }).join("");
+
+  // 계획 시작/마감 지점을 세로선으로 표시 (하루짜리 계획은 시작=마감이라 선을 하나로 합침)
+  const boundaryLines = isSingleDay
+    ? `<div style="position:absolute; left:50%; top:2px; bottom:2px; width:2px; background:var(--gray); opacity:0.45; border-radius:1px;"></div>`
+    : `
+    <div style="position:absolute; left:4%; top:2px; bottom:2px; width:2px; background:var(--gray); opacity:0.45; border-radius:1px;"></div>
+    <div style="position:absolute; left:96%; top:2px; bottom:2px; width:2px; background:var(--gray); opacity:0.45; border-radius:1px;"></div>
+  `;
+
+  // 오늘이 계획 기간 안에 있으면 세로선으로 표시
+  const today = new Date(seoulTodayString());
+  let todayLine = "";
+  let todayLabel = "";
+  if (today >= start && today <= end) {
+    const todayPos = toPos(today);
+    todayLine = `<div style="position:absolute; left:${todayPos}%; top:2px; bottom:2px; width:2px; background:var(--yellow-dark); opacity:0.7; border-radius:1px;"></div>`;
+    todayLabel = `<div style="position:absolute; left:${todayPos}%; top:80px; transform:translateX(-50%); font-size:9px; font-weight:700; color:var(--yellow-dark); white-space:nowrap;">오늘</div>`;
+  }
+
+  const listRows = tasks.length
+    ? tasks.map(t => {
+        const statusColor = t.status === "done" ? "var(--mint-dark)" : (isTaskDelayed(t) ? "var(--red-dark)" : "var(--sub)");
+        const statusIcon = t.status === "done" ? "✓" : (isTaskDelayed(t) ? "!" : "○");
+        return `
+          <div id="timeline-task-${t.id}" style="display:flex; align-items:center; gap:8px; padding:8px 6px; border-radius:8px; border-bottom:1px solid #f0f1f2; font-size:12px; transition: background .4s;">
+            <span style="color:${statusColor}; font-weight:700; width:14px; text-align:center; flex-shrink:0;">${statusIcon}</span>
+            <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(t.title)}</span>
+            <span style="color:var(--sub); flex-shrink:0;">${formatDate(t.deadline)}</span>
+          </div>
+        `;
+      }).join("")
+    : `<div style="padding:24px 0; text-align:center; color:var(--sub); font-size:12px;">아직 할 일이 없어요.</div>`;
+
+  document.getElementById("planTimelineBody").innerHTML = `
+    <div style="font-size:11px; color:var(--sub); margin-bottom:4px;">${formatDate(plan.startDate)} ~ ${formatDate(plan.endDate)} · ${planDDayLabel(plan)}</div>
+    <div style="font-size:10px; color:var(--sub); margin-bottom:10px;">각 점은 할 일 마감일이에요 · 점을 누르면 아래에서 확인할 수 있어요</div>
+
+    <div style="position:relative; margin-bottom:${todayLabel ? "40px" : "16px"};">
+      <div style="position:relative; height:56px; background:#f7f8f9; border-radius:12px; overflow:hidden;">
+        ${boundaryLines}
+        ${todayLine}
+        ${dots}
+      </div>
+      ${isSingleDay
+        ? `<div style="position:absolute; left:50%; top:66px; transform:translateX(-50%); font-size:9px; color:var(--sub); white-space:nowrap;">시작·마감 ${formatDate(plan.startDate)}</div>`
+        : `
+      <div style="position:absolute; left:4%; top:66px; font-size:9px; color:var(--sub); transform:translateX(-2px);">시작 ${formatDate(plan.startDate)}</div>
+      <div style="position:absolute; right:4%; top:66px; font-size:9px; color:var(--sub); transform:translateX(2px);">마감 ${formatDate(plan.endDate)}</div>
+      `}
+      ${todayLabel}
+    </div>
+
+    <div style="display:flex; gap:14px; margin-bottom:14px; font-size:9px; color:var(--sub); flex-wrap:wrap;">
+      <span><span style="color:var(--blue-dark);">●</span> 진행중</span>
+      <span><span style="color:var(--mint-dark);">●</span> 완료</span>
+      <span><span style="color:var(--red-dark);">●</span> 지연</span>
+      <span><span style="color:var(--gray);">┃</span> 시작/마감</span>
+      ${todayLabel ? `<span><span style="color:var(--yellow-dark);">┃</span> 오늘</span>` : ""}
+    </div>
+    <div style="max-height:220px; overflow-y:auto; padding-right:4px;">${listRows}</div>
+  `;
+  document.getElementById("planTimelineModal").classList.add("open");
+}
+
+/* 타임라인 점 클릭 시 아래 목록에서 해당 할 일을 스크롤+하이라이트 */
+function highlightTimelineTask(taskId) {
+  const el = document.getElementById(`timeline-task-${taskId}`);
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.style.background = "var(--blue)";
+  setTimeout(() => { el.style.background = ""; }, 1300);
+}
+
+
+/* Task Detail Modal — 긴 제목을 "자세히 보기"로 전체 확인 */
+function openTaskDetailModal(taskId) {
+  const task = data.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  const plan = data.plans.find(p => p.id === task.planId);
+  const isDelay = isTaskDelayed(task);
+  const isBlocked = isTaskBlocked(task);
+
+  // 헤더: 작은 라벨 + 큰 제목 + 계획명(설명 대용)
+  const modalEl = document.getElementById("taskDetailModal");
+  const titleEl = document.getElementById("taskDetailTitle");
+  const toggleBtn = document.getElementById("taskDetailToggle");
+  const planNameEl = document.getElementById("taskDetailPlanName");
+  const planToggleBtn = document.getElementById("taskDetailPlanToggle");
+
+  titleEl.textContent = task.title;
+  titleEl.classList.remove("expanded");
+  titleEl.classList.add("clamped"); // 모달 열 때마다 접힌 상태로 초기화
+  toggleBtn.style.transform = "rotate(0deg)";
+  toggleBtn.title = "펼쳐보기";
+
+  planNameEl.textContent = plan ? plan.title : "계획 없음";
+  planNameEl.classList.remove("expanded");
+  planNameEl.classList.add("clamped");
+  planToggleBtn.style.transform = "rotate(0deg)";
+  planToggleBtn.title = "펼쳐보기";
+
+  modalEl.classList.add("open"); // 먼저 열어야 실제 렌더링된 높이를 측정할 수 있다
+  toggleBtn.style.display = titleEl.scrollHeight > titleEl.clientHeight + 1 ? "flex" : "none";
+  planToggleBtn.style.display = planNameEl.scrollHeight > planNameEl.clientHeight + 1 ? "flex" : "none";
+
+  const [dy, dm, dd] = (task.deadline || "").split("-");
+  const deadlineLabel = dm && dd ? `${Number(dm)}월 ${Number(dd)}일` : formatDate(task.deadline);
+
+  const isDone = task.status === "done";
+  const doIcon = isDone ? "✓" : "●";
+  const doColor = isDone ? "var(--mint-dark)" : "var(--gray)";
+  const doText = isDone ? "완료" : "진행 중";
+
+  const relatedExecutions = data.executions.filter(e => e.taskId === task.id && !e.completion);
+  const actualMinutes = relatedExecutions.reduce((sum, e) => sum + Number(e.actualMinutes || 0), 0);
+  const hasExecution = relatedExecutions.length > 0;
+  const diff = actualMinutes - task.estimatedMinutes;
+
+  let seeLine;
+  if (!hasExecution) {
+    seeLine = `<div style="color: var(--sub);">아직 실행 기록이 없어요.</div>`;
+  } else {
+    const diffText = diff === 0
+      ? "예상과 실제 시간이 같아요."
+      : diff > 0
+        ? `예상보다 ${formatMinutes(diff)} 더 걸렸어요.`
+        : `예상보다 ${formatMinutes(Math.abs(diff))} 빠르게 완료했어요.`;
+    seeLine = `
+      <div>예상 ${formatMinutes(task.estimatedMinutes)} · 실제 ${formatMinutes(actualMinutes)}</div>
+      <div style="margin-top: 3px; color: var(--sub);">${diffText}</div>
+    `;
+  }
+
+  const calendarIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;
+  const clockIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`;
+  const boltIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>`;
+  const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+
+  const sectionLabel = (text) => `<div style="font-size: 10px; font-weight: 700; color: var(--sub); letter-spacing: 0.5px; margin-bottom: 6px;">${text}</div>`;
+
+  document.getElementById("taskDetailBody").innerHTML = `
+    <div class="task-meta" style="margin: 14px 0 16px; align-items: center;">
+      <span class="priority ${task.priority}">${priorityText(task.priority)}</span>
+      <span class="tag" style="background: var(--blue); color: var(--blue-dark); display: inline-flex; align-items: center; gap: 4px; ${isDelay ? "background: var(--red-soft); color: var(--red);" : ""}">${calendarIcon}${deadlineLabel}</span>
+      ${task.tag ? `<span class="tag">${escapeHTML(task.tag)}</span>` : ""}
+      ${isBlocked ? `<span class="tag blocked">막힘</span>` : ""}
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 18px;">
+      <div style="flex: 1; display: flex; align-items: center; gap: 10px; background: var(--blue); background: #eef4fb; border-radius: 14px; padding: 12px 14px;">
+        <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--blue); color: var(--blue-dark); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${clockIcon}</div>
+        <div>
+          <div style="font-size: 10px; color: var(--sub);">예상 시간</div>
+          <div style="margin-top: 2px; font-size: 16px; font-weight: 750; color: #20242c;">${formatMinutes(task.estimatedMinutes)}</div>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; align-items: center; gap: 10px; background: #eef7f2; border-radius: 14px; padding: 12px 14px;">
+        <div style="width: 36px; height: 36px; border-radius: 50%; background: ${isDone ? "var(--mint)" : "var(--blue)"}; color: ${isDone ? "var(--mint-dark)" : "var(--blue-dark)"}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${isDone ? checkIcon : boltIcon}</div>
+        <div>
+          <div style="font-size: 10px; color: var(--sub);">상태</div>
+          <div style="margin-top: 2px; font-size: 16px; font-weight: 750; color: ${isDone ? "var(--mint-dark)" : "#20242c"};">${doText}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      ${sectionLabel("PLAN")}
+      <div style="background: #f7f8f9; border-radius: 14px; padding: 12px 14px; max-height: 130px; overflow-y: auto; font-size: 12px; line-height: 1.6; color: #4b5563; word-break: break-word;">
+        ${plan && plan.description ? `<div style="margin-bottom: 8px;"><strong style="color:#20242c;">설명</strong><br>${escapeHTML(plan.description)}</div>` : ""}
+        <div><strong style="color:#20242c;">성공 기준</strong><br>${plan && plan.success ? escapeHTML(plan.success) : "아직 정해둔 성공 기준이 없어요."}</div>
+      </div>
+    </div>
+
+    <div style="display: flex;">
+      <div style="flex: 1; padding-right: 16px;">
+        ${sectionLabel("DO")}
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4b5563;">
+          <span style="color: ${doColor}; font-weight: 700;">${doIcon}</span>
+          <span>${doText}</span>
+        </div>
+      </div>
+      <div style="flex: 1.4; border-left: 1px solid var(--line); padding-left: 16px;">
+        ${sectionLabel("SEE")}
+        <div style="font-size: 12px; color: #4b5563;">${seeLine}</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("taskDetailModal").classList.add("open");
+}
+
+/* 잘린 텍스트를 화살표로 펼치기/접기 (제목·계획명 공용) */
+function toggleClampedText(textId, btnId) {
+  const el = document.getElementById(textId);
+  const btn = document.getElementById(btnId);
+  const expanded = el.classList.toggle("expanded");
+
+  if (expanded) {
+    el.classList.remove("clamped");
+    btn.style.transform = "rotate(180deg)";
+    btn.title = "접기";
+  } else {
+    el.classList.add("clamped");
+    btn.style.transform = "rotate(0deg)";
+    btn.title = "펼쳐보기";
+  }
+}
+
+
+/* Task Modal */
+function openTaskModal(taskId = null) {
+  fillTaskPlanOptions();
+  document.getElementById("taskModal").classList.add("open");
+  document.getElementById("editTaskId").value = taskId || "";
+
+  if (taskId) {
+    const task = data.tasks.find(t => t.id === Number(taskId));
+    if (!task) return;
+    document.getElementById("taskTitle").value = task.title;
+    document.getElementById("taskPlan").value = task.planId;
+    document.getElementById("taskPriority").value = task.priority;
+    document.getElementById("taskDeadline").value = task.deadline;
+    document.getElementById("taskEstimate").value = task.estimatedMinutes;
+    document.getElementById("taskTag").value = task.tag || "";
+  } else {
+    document.getElementById("taskTitle").value = "";
+    document.getElementById("taskPriority").value = "medium";
+    document.getElementById("taskDeadline").value = formatDateInput(selectedCalendarDate);
+    document.getElementById("taskEstimate").value = 60;
+    document.getElementById("taskTag").value = "";
+  }
+
+  applyPlanDateRangeToTaskDeadline();
+}
+
+/* 선택된 계획의 기간을 마감일 입력 범위(min/max)로 강제 적용 */
+function applyPlanDateRangeToTaskDeadline() {
+  const planId = Number(document.getElementById("taskPlan").value);
+  const plan = data.plans.find(p => p.id === planId);
+  const input = document.getElementById("taskDeadline");
+  if (!plan) { input.removeAttribute("min"); input.removeAttribute("max"); return; }
+
+  input.min = plan.startDate;
+  input.max = plan.endDate;
+
+  if (input.value && (input.value < plan.startDate || input.value > plan.endDate)) {
+    // 계획이 바뀌어서 기존 마감일이 범위를 벗어나면 계획 기간 안으로 자동 조정
+    input.value = (seoulTodayString() >= plan.startDate && seoulTodayString() <= plan.endDate)
+      ? seoulTodayString()
+      : plan.startDate;
+  }
+}
+
+/* Home의 "빈 계획" 카드에서 바로 그 계획으로 할 일 추가하기 */
+function openTaskModalForPlan(planId) {
+  openTaskModal();
+  document.getElementById("taskPlan").value = planId;
+  applyPlanDateRangeToTaskDeadline();
+}
+
+function fillTaskPlanOptions() {
+  const select = document.getElementById("taskPlan");
+  select.innerHTML = "";
+  data.plans.forEach(plan => {
+    const option = document.createElement("option");
+    option.value = plan.id; option.textContent = truncateText(plan.title, 30);
+    select.appendChild(option);
+  });
+}
+
+
+/* Save Task */
+async function saveTask(event) {
+  event.preventDefault();
+  const id = document.getElementById("editTaskId").value;
+  const title = document.getElementById("taskTitle").value.trim();
+  const planId = Number(document.getElementById("taskPlan").value);
+  const priority = document.getElementById("taskPriority").value;
+  const deadline = document.getElementById("taskDeadline").value;
+  const estimatedMinutes = Number(document.getElementById("taskEstimate").value);
+  const tag = document.getElementById("taskTag").value.trim();
+
+  if (!title) { showToast("할 일 내용을 입력해주세요."); return; }
+  if (estimatedMinutes < 0 || estimatedMinutes > 1440 || Number.isNaN(estimatedMinutes)) { showToast("예상 시간은 0~1440분(24시간) 사이로 입력해주세요."); return; }
+
+  const parentPlan = data.plans.find(p => p.id === planId);
+  if (parentPlan && (deadline < parentPlan.startDate || deadline > parentPlan.endDate)) {
+    showToast(`마감일은 계획 기간(${formatDate(parentPlan.startDate)}~${formatDate(parentPlan.endDate)}) 안에서만 정할 수 있어요.`);
+    return;
+  }
+
+  const payload = { plan_id: planId, title, priority, deadline, estimated_minutes: estimatedMinutes, tag };
+
+  try {
+    if (id) {
+      throwIfError((await sb.from("tasks").update(payload).eq("id", id)).error);
+      showToast("할 일이 수정되었습니다.");
+    } else {
+      throwIfError((await sb.from("tasks").insert(payload)).error);
+      showToast("할 일이 추가되었습니다.");
+    }
+    closeModal("taskModal");
+    await refreshAndRender();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* 지연 / 막힘 판정 (서울 시간 기준) */
+function isTaskDelayed(task) {
+  return task.status !== "done" && task.deadline && task.deadline < seoulTodayString();
+}
+function isTaskBlocked(task) {
+  return data.executions.some(execution => execution.taskId === task.id && execution.blockedReason && execution.blockedReason.trim());
+}
+
+
+/* Tasks */
+function populateTaskPlanFilterOptions() {
+  const select = document.getElementById("taskPlanFilter");
+  const current = select.value;
+  select.innerHTML = `<option value="all">전체 계획</option>`;
+  data.plans.forEach(plan => {
+    const option = document.createElement("option");
+    option.value = plan.id;
+    option.textContent = truncateText(plan.title, 20);
+    select.appendChild(option);
+  });
+  if (current && [...select.options].some(o => o.value === current)) select.value = current;
+}
+
+function buildTaskRow(task) {
+  const plan = data.plans.find(p => p.id === task.planId);
+  const isDelay = isTaskDelayed(task);
+  const isBlocked = isTaskBlocked(task);
+
+  const row = document.createElement("div");
+  row.className = "task-row";
+  row.innerHTML = `
+    <button class="task-check ${task.status === "done" ? "done" : ""}"
+      onclick="${task.status === "done" ? `undoTaskDone(${task.id})` : `markTaskDone(${task.id})`}"
+      title="${task.status === "done" ? "되돌리기" : "완료"}">
+      ${task.status === "done" ? "✓" : ""}
+    </button>
+    <div class="task-main">
+      <h3 class="${task.status === "done" ? "done" : ""}">${escapeHTML(task.title)}</h3>
+      <button class="detail-link" style="display:none; margin:4px 0 2px;" onclick="openTaskDetailModal(${task.id})">자세히 보기</button>
+      <div class="task-meta">
+        <span class="tag">${plan ? escapeHTML(plan.title) : "계획 없음"}</span>
+        ${task.tag ? `<span class="tag">${escapeHTML(task.tag)}</span>` : ""}
+        <span class="tag">${priorityText(task.priority)}</span>
+        <span class="tag ${isDelay ? "deadline" : ""}">마감 ${formatDate(task.deadline)}</span>
+        ${isBlocked ? `<span class="tag blocked">막힘</span>` : ""}
+      </div>
+    </div>
+    <div class="task-estimate">${formatMinutes(task.estimatedMinutes)}</div>
+    <button class="icon-btn" onclick="openTaskModal(${task.id})" title="수정">✎</button>
+    <button class="icon-btn" onclick="deleteTask(${task.id})" title="삭제">×</button>
+  `;
+  return row;
+}
+
+function renderTaskGroupHeader(list, opts) {
+  const header = document.createElement("button");
+  header.type = "button";
+  header.style.cssText = `
+    display:flex; align-items:center; gap:8px; width:100%;
+    margin: 10px 0 8px; padding: 10px 12px;
+    background: ${opts.isExpanded ? "#fff" : "#f7f8f9"};
+    border: 1.5px solid ${opts.isExpanded ? opts.colorVar : "var(--line)"};
+    border-radius: 12px; cursor:pointer; text-align:left;
+    box-shadow: ${opts.isExpanded ? "var(--shadow)" : "none"};
+    transition: background .15s, border-color .15s;
+  `;
+  header.onclick = opts.onToggle;
+  header.innerHTML = `
+    <span style="font-size:10px; color:${opts.colorVar}; display:inline-block; transform:rotate(${opts.isExpanded ? "90deg" : "0deg"}); transition:transform .15s;">▸</span>
+    <span style="font-size:12px; font-weight:750; color:${opts.colorVar};">${opts.label}</span>
+    <span style="font-size:10px; color:var(--sub);">${opts.count}개</span>
+    ${opts.hasDelayed ? `<span style="width:6px; height:6px; border-radius:50%; background:var(--red-dark); margin-left:2px;" title="지연된 할 일 포함"></span>` : ""}
+    <span style="flex:1;"></span>
+  `;
+  list.appendChild(header);
+}
+
+function renderTasks() {
+  populateTaskPlanFilterOptions();
+
+  const list = document.getElementById("taskList");
+  const search = document.getElementById("taskSearch").value.trim().toLowerCase();
+  const filter = document.getElementById("taskFilter").value;
+  const sort = document.getElementById("taskSort").value;
+  const planFilter = document.getElementById("taskPlanFilter").value;
+
+  let tasks = [...data.tasks];
+
+  if (planFilter !== "all") tasks = tasks.filter(task => task.planId === Number(planFilter));
+
+  if (search) {
+    tasks = tasks.filter(task => {
+      const plan = data.plans.find(p => p.id === task.planId);
+      const target = [task.title, task.tag, plan?.title].filter(Boolean).join(" ").toLowerCase();
+      return target.includes(search);
+    });
+  }
+
+  if (filter === "todo") tasks = tasks.filter(task => task.status === "todo");
+  if (filter === "done") tasks = tasks.filter(task => task.status === "done");
+  if (filter === "delay") tasks = tasks.filter(isTaskDelayed);
+  if (filter === "blocked") tasks = tasks.filter(isTaskBlocked);
+
+  const notice = document.getElementById("taskSortNotice");
+
+  if (taskViewMode === "date" || taskViewMode === "month") {
+    tasks.sort((a, b) => a.deadline.localeCompare(b.deadline) || a.id - b.id);
+
+    list.innerHTML = "";
+    if (!tasks.length) { list.innerHTML = emptyHTML("조건에 맞는 할 일이 없어요.", "검색이나 필터 조건을 바꿔보세요."); return; }
+
+    if (taskViewMode === "date") {
+      notice.textContent = `날짜별 보기 · 날짜를 눌러 펼치고 접을 수 있어요 (지연 판정은 서울 시간 기준 오늘: ${seoulTodayString()})`;
+
+      const today = seoulTodayString();
+      const groups = [];
+      tasks.forEach(task => {
+        const last = groups[groups.length - 1];
+        if (last && last.key === task.deadline) last.tasks.push(task);
+        else groups.push({ key: task.deadline, tasks: [task] });
+      });
+
+      groups.forEach(group => {
+        if (!taskDateGroupsSeen.has(group.key)) {
+          taskDateGroupsSeen.add(group.key);
+          if (group.key === today) expandedTaskDates.add(group.key);
+        }
+        const isPast = group.key < today;
+        const isToday = group.key === today;
+        const colorVar = isPast ? "var(--red-dark)" : (isToday ? "var(--blue-dark)" : "var(--sub)");
+        const label = (isPast ? "지난 날짜 · " : isToday ? "오늘 · " : "") + formatDate(group.key);
+
+        renderTaskGroupHeader(list, {
+          label, count: group.tasks.length, colorVar,
+          isExpanded: expandedTaskDates.has(group.key),
+          hasDelayed: group.tasks.some(isTaskDelayed) && !expandedTaskDates.has(group.key),
+          onToggle: () => toggleTaskDateGroup(group.key)
+        });
+        if (expandedTaskDates.has(group.key)) group.tasks.forEach(task => list.appendChild(buildTaskRow(task)));
+      });
+    } else {
+      notice.textContent = `월별 보기 · 달을 눌러 펼치고 접을 수 있어요 (지연 판정은 서울 시간 기준 오늘: ${seoulTodayString()})`;
+
+      const todayMonth = seoulTodayString().slice(0, 7);
+      const groups = [];
+      tasks.forEach(task => {
+        const monthKey = task.deadline.slice(0, 7);
+        const last = groups[groups.length - 1];
+        if (last && last.key === monthKey) last.tasks.push(task);
+        else groups.push({ key: monthKey, tasks: [task] });
+      });
+
+      groups.forEach(group => {
+        if (!taskMonthGroupsSeen.has(group.key)) {
+          taskMonthGroupsSeen.add(group.key);
+          if (group.key === todayMonth) expandedTaskMonths.add(group.key);
+        }
+        const isPast = group.key < todayMonth;
+        const isCurrent = group.key === todayMonth;
+        const colorVar = isPast ? "var(--red-dark)" : (isCurrent ? "var(--blue-dark)" : "var(--sub)");
+        const [y, m] = group.key.split("-");
+        const label = (isPast ? "지난 달 · " : isCurrent ? "이번 달 · " : "") + `${y}년 ${Number(m)}월`;
+
+        renderTaskGroupHeader(list, {
+          label, count: group.tasks.length, colorVar,
+          isExpanded: expandedTaskMonths.has(group.key),
+          hasDelayed: group.tasks.some(isTaskDelayed) && !expandedTaskMonths.has(group.key),
+          onToggle: () => toggleTaskMonthGroup(group.key)
+        });
+        if (expandedTaskMonths.has(group.key)) group.tasks.forEach(task => list.appendChild(buildTaskRow(task)));
+      });
+    }
+  } else {
+    if (sort === "created") tasks.sort((a,b) => (new Date(a.createdAt) - new Date(b.createdAt)) || a.id - b.id);
+    if (sort === "priority") { const rank = { high: 1, medium: 2, low: 3 }; tasks.sort((a,b) => rank[a.priority] - rank[b.priority] || a.id - b.id); }
+    if (sort === "deadline") tasks.sort((a,b) => a.deadline.localeCompare(b.deadline) || a.id - b.id);
+    if (sort === "estimate") tasks.sort((a,b) => a.estimatedMinutes - b.estimatedMinutes || a.id - b.id);
+
+    const sortNames = {
+      created: "생성 순 · 값이 같으면 ID가 작은 순",
+      priority: "우선순위 · 높음 → 보통 → 낮음 · 값이 같으면 ID가 작은 순",
+      deadline: "마감일 빠른 순 · 값이 같으면 ID가 작은 순",
+      estimate: "예상 시간 짧은 순 · 값이 같으면 ID가 작은 순"
+    };
+    notice.textContent = `정렬 기준: ${sortNames[sort]} (지연 판정은 서울 시간 기준 오늘: ${seoulTodayString()})`;
+
+    list.innerHTML = "";
+    if (!tasks.length) { list.innerHTML = emptyHTML("조건에 맞는 할 일이 없어요.", "검색이나 필터 조건을 바꿔보세요."); return; }
+
+    tasks.forEach(task => list.appendChild(buildTaskRow(task)));
+  }
+
+  // 2줄로 잘려서 실제로 말줄임이 생긴 제목에만 "자세히 보기"를 보여준다
+  list.querySelectorAll(".task-row").forEach(row => {
+    const h3 = row.querySelector(".task-main h3");
+    const link = row.querySelector(".detail-link");
+    if (!h3 || !link) return;
+    link.style.display = h3.scrollHeight > h3.clientHeight + 1 ? "block" : "none";
+  });
+}
+
+function setTaskViewMode(mode) {
+  taskViewMode = mode;
+  document.querySelectorAll("[data-task-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.taskView === mode));
+  renderTasks();
+}
+
+function toggleTaskDateGroup(date) {
+  if (expandedTaskDates.has(date)) expandedTaskDates.delete(date);
+  else expandedTaskDates.add(date);
+  renderTasks();
+}
+
+function toggleTaskMonthGroup(month) {
+  if (expandedTaskMonths.has(month)) expandedTaskMonths.delete(month);
+  else expandedTaskMonths.add(month);
+  renderTasks();
+}
+
+
+/* 완료 / 되돌리기 — Postgres의 원자적 UPDATE...WHERE로 멱등성 보장 */
+async function markTaskDone(taskId) {
+  try {
+    const nowIso = new Date().toISOString();
+
+    // 이미 완료 상태면 이 UPDATE는 0행에 적용되고 끝난다 (중복 완료 방지, T06-C21)
+    const { data: updatedRows, error } = await sb.from("tasks")
+      .update({ status: "done", completed_at: nowIso })
+      .eq("id", taskId)
+      .neq("status", "done")
+      .select();
+    throwIfError(error);
+
+    if (updatedRows.length > 0) {
+      const { data: existing, error: eq } = await sb.from("executions")
+        .select("id").eq("task_id", taskId).eq("completion", true).limit(1);
+      throwIfError(eq);
+
+      if (!existing.length) {
+        throwIfError((await sb.from("executions").insert({
+          task_id: taskId, start_time: nowIso, end_time: nowIso,
+          actual_minutes: 0, blocked_reason: "", memo: "완료 처리됨", completion: true
+        })).error);
+      }
+    }
+
+    await refreshAndRender();
+    showToast("할 일을 완료했습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+async function undoTaskDone(taskId) {
+  try {
+    throwIfError((await sb.from("tasks").update({ status: "todo", completed_at: null }).eq("id", taskId).eq("status", "done")).error);
+    // 이미 만들어진 completion=true 실행기록은 감사 목적으로 유지, 지우지 않는다
+    await refreshAndRender();
+    showToast("완료한 할 일을 다시 진행 중으로 되돌렸습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Delete Task — executions는 ON DELETE CASCADE로 함께 삭제됨 */
+async function deleteTask(taskId) {
+  const task = data.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (!confirm(`"${task.title}" 할 일을 삭제할까요?`)) return;
+
+  try {
+    throwIfError((await sb.from("tasks").delete().eq("id", taskId)).error);
+    await refreshAndRender();
+    showToast("할 일이 삭제되었습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Go Task Filter / Go Executions */
+function goTasks(filter) {
+  showPage("tasks");
+  populateTaskPlanFilterOptions();
+  document.getElementById("taskSearch").value = "";
+  document.getElementById("taskFilter").value = filter;
+  document.getElementById("taskPlanFilter").value = selectedSeePlanId != null ? String(selectedSeePlanId) : "all";
+  renderTasks();
+}
+function goExecutions() {
+  showPage("do");
+  populateDoPlanFilterOptions();
+  document.getElementById("doPlanFilter").value = selectedSeePlanId != null ? String(selectedSeePlanId) : "all";
+  renderExecutions();
+}
+
+
+/* Execution Options */
+function populateExecutionTaskPlanFilterOptions() {
+  const select = document.getElementById("executionTaskPlanFilter");
+  const current = select.value;
+  select.innerHTML = `<option value="all">전체 계획</option>`;
+  data.plans.forEach(plan => {
+    const option = document.createElement("option");
+    option.value = plan.id;
+    option.textContent = truncateText(plan.title, 18);
+    select.appendChild(option);
+  });
+  if (current && [...select.options].some(o => o.value === current)) select.value = current;
+}
+
+function renderExecutionTaskOptions() {
+  populateExecutionTaskPlanFilterOptions();
+
+  const select = document.getElementById("executionTask");
+  const current = select.value;
+  select.innerHTML = "";
+
+  const planFilterEl = document.getElementById("executionTaskPlanFilter");
+  const planFilter = planFilterEl ? planFilterEl.value : "all";
+  const tasksForSelect = planFilter !== "all" ? data.tasks.filter(t => t.planId === Number(planFilter)) : data.tasks;
+
+  if (!tasksForSelect.length) {
+    const option = document.createElement("option");
+    option.value = ""; option.textContent = "이 계획엔 할 일이 없어요";
+    select.appendChild(option);
+  } else {
+    tasksForSelect.forEach(task => {
+      const option = document.createElement("option");
+      option.value = task.id;
+      option.textContent = `${task.status === "done" ? "✓ " : ""}${truncateText(task.title, 30)}`;
+      select.appendChild(option);
+    });
+  }
+
+  if (current && [...select.options].some(option => option.value === current)) select.value = current;
+
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const start = document.getElementById("executionStart");
+  const end = document.getElementById("executionEnd");
+  if (!start.value) start.value = toDateTimeLocal(oneHourAgo);
+  if (!end.value) end.value = toDateTimeLocal(now);
+
+  recalcExecutionMinutes();
+}
+
+
+/* 실행 시간 자동 계산 */
+function recalcExecutionMinutes() {
+  const start = document.getElementById("executionStart").value;
+  const end = document.getElementById("executionEnd").value;
+  if (!start || !end) return;
+  const diffMs = new Date(end) - new Date(start);
+  if (diffMs <= 0) return;
+  document.getElementById("executionMinutes").value = Math.round(diffMs / 60000);
+}
+
+
+/* Save Execution — 서버가 UNIQUE(task_id, start, end)로 중복을 막는다 */
+async function saveExecution(event) {
+  event.preventDefault();
+  const taskId = Number(document.getElementById("executionTask").value);
+  const start = document.getElementById("executionStart").value;
+  const end = document.getElementById("executionEnd").value;
+  const actualMinutes = Number(document.getElementById("executionMinutes").value);
+  const blockedReason = document.getElementById("executionBlocked").value.trim();
+  const memo = document.getElementById("executionMemo").value.trim();
+
+  if (new Date(end) < new Date(start)) { showToast("끝난 시각은 시작 시각보다 빠를 수 없습니다."); return; }
+  if (actualMinutes < 0 || actualMinutes > 1440 || Number.isNaN(actualMinutes)) { showToast("실제 시간은 0~1440분(24시간) 사이로 입력해주세요."); return; }
+
+  try {
+    throwIfError((await sb.from("executions").insert({
+      task_id: taskId, start_time: start, end_time: end,
+      actual_minutes: actualMinutes, blocked_reason: blockedReason, memo, completion: false
+    })).error);
+
+    document.getElementById("executionMinutes").value = "";
+    document.getElementById("executionBlocked").value = "";
+    document.getElementById("executionMemo").value = "";
+
+    await refreshAndRender();
+    showToast("실행 기록이 저장되었습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Executions */
+function populateDoPlanFilterOptions() {
+  const select = document.getElementById("doPlanFilter");
+  const current = select.value;
+  select.innerHTML = `<option value="all">전체 계획</option>`;
+  data.plans.forEach(plan => {
+    const option = document.createElement("option");
+    option.value = plan.id;
+    option.textContent = truncateText(plan.title, 20);
+    select.appendChild(option);
+  });
+  if (current && [...select.options].some(o => o.value === current)) select.value = current;
+}
+
+function renderExecutions() {
+  populateDoPlanFilterOptions();
+
+  const list = document.getElementById("executionList");
+  list.innerHTML = "";
+
+  const planFilter = document.getElementById("doPlanFilter").value;
+
+  let records = data.executions.filter(execution => !execution.completion);
+
+  if (planFilter !== "all") {
+    const planTaskIds = new Set(data.tasks.filter(t => t.planId === Number(planFilter)).map(t => t.id));
+    records = records.filter(execution => planTaskIds.has(execution.taskId));
+  }
+
+  if (!records.length) { list.innerHTML = emptyHTML("아직 실행 기록이 없어요.", "실제로 한 일을 기록해보세요."); return; }
+
+  records.slice().reverse().forEach(execution => {
+    const task = data.tasks.find(t => t.id === execution.taskId);
+    const card = document.createElement("div");
+    card.className = "execution-card";
+    card.innerHTML = `
+      <div class="execution-icon">◷</div>
+      <div class="execution-info">
+        <strong>${task ? escapeHTML(task.title) : "삭제된 할 일"}</strong>
+        <span>${formatDateTime(execution.start)} · ${formatMinutes(execution.actualMinutes)}${execution.blockedReason ? ` · 막힘: ${escapeHTML(execution.blockedReason)}` : ""}</span>
+      </div>
+      <div class="execution-time">${formatMinutes(execution.actualMinutes)}</div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+
+/* See */
+function populateSeePlanSelect() {
+  const select = document.getElementById("seePlanSelect");
+  const stillValid = data.plans.some(p => p.id === selectedSeePlanId);
+  if (!stillValid) selectedSeePlanId = data.plans.length ? data.plans[0].id : null;
+
+  select.innerHTML = "";
+  data.plans.forEach(plan => {
+    const option = document.createElement("option");
+    option.value = plan.id;
+    option.textContent = truncateText(plan.title, 20);
+    select.appendChild(option);
+  });
+  if (selectedSeePlanId != null) select.value = selectedSeePlanId;
+}
+
+function onSeePlanChange() {
+  selectedSeePlanId = Number(document.getElementById("seePlanSelect").value);
+  renderSee();
+}
+
+function calculateSee(planId) {
+  const today = seoulTodayString();
+  const tasks = data.tasks.filter(task => task.planId === planId);
+  const taskIds = new Set(tasks.map(task => task.id));
+  const executions = data.executions.filter(execution => taskIds.has(execution.taskId));
+
+  const plansCount = tasks.length;
+  const doneCount = tasks.filter(task => task.status === "done").length;
+  const delayCount = tasks.filter(task => task.status !== "done" && task.deadline < today).length;
+
+  const blockedTaskIds = new Set(executions.filter(execution => execution.blockedReason && execution.blockedReason.trim()).map(execution => execution.taskId));
+  const blockedCount = blockedTaskIds.size;
+
+  const estimate = tasks.reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0);
+  const actual = executions.filter(execution => !execution.completion).reduce((sum, execution) => sum + Number(execution.actualMinutes || 0), 0);
+
+  return { plansCount, doneCount, delayCount, blockedCount, estimate, actual, difference: actual - estimate };
+}
+
+function renderSee() {
+  populateSeePlanSelect();
+
+  const emptyState = document.getElementById("seeEmptyState");
+  const content = document.getElementById("seeContent");
+  const selector = document.getElementById("seePlanSelect");
+
+  if (!data.plans.length) {
+    emptyState.classList.remove("hidden");
+    content.classList.add("hidden");
+    selector.classList.add("hidden");
+    return;
+  }
+  emptyState.classList.add("hidden");
+  content.classList.remove("hidden");
+  selector.classList.remove("hidden");
+
+  const stats = calculateSee(selectedSeePlanId);
+
+  document.getElementById("seePlanCount").textContent = stats.plansCount;
+  document.getElementById("seeDoneCount").textContent = stats.doneCount;
+  document.getElementById("seeDelayCount").textContent = stats.delayCount;
+  document.getElementById("seeBlockedCount").textContent = stats.blockedCount;
+
+  document.getElementById("estimateTotal").textContent = formatMinutes(stats.estimate);
+  document.getElementById("actualTotal").textContent = formatMinutes(stats.actual);
+
+  const max = Math.max(stats.estimate, stats.actual, 1);
+  document.getElementById("estimateBar").style.width = `${Math.round(stats.estimate / max * 100)}%`;
+  document.getElementById("actualBar").style.width = `${Math.round(stats.actual / max * 100)}%`;
+
+  const diffText = stats.difference > 0 ? `+${stats.difference}분` : `${stats.difference}분`;
+  document.getElementById("timeDifference").textContent = diffText;
+
+  const insightTitle = document.getElementById("insightTitle");
+  const insightText = document.getElementById("insightText");
+
+  if (stats.actual > stats.estimate && stats.actual > 0) {
+    insightTitle.textContent = "예상보다 시간이 더 필요했어요.";
+    insightText.textContent = `예상보다 ${stats.difference}분 더 걸렸어요. 다음 계획에서는 예상 시간을 조금 넉넉하게 잡아보세요.`;
+  } else if (stats.actual > 0) {
+    insightTitle.textContent = "예상 시간 안에서 잘 진행했어요.";
+    insightText.textContent = "실제 실행 기록이 쌓이고 있어요. 어떤 작업에서 반복적으로 시간이 늘어나는지 확인해보세요.";
+  } else {
+    insightTitle.textContent = "아직 실행 기록이 없어요.";
+    insightText.textContent = "실제로 한 일을 Do에서 기록하면 예상과 실제를 비교할 수 있어요.";
+  }
+
+  renderSeeEvidence(selectedSeePlanId);
+  renderNextPlan();
+}
+
+
+/* See Evidence */
+function renderSeeEvidence(planId) {
+  const box = document.getElementById("seeEvidence");
+  box.innerHTML = "";
+  const today = seoulTodayString();
+
+  const tasks = data.tasks.filter(task => task.planId === planId);
+  const taskIds = new Set(tasks.map(task => task.id));
+  const executions = data.executions.filter(execution => taskIds.has(execution.taskId));
+
+  const groups = [
+    { title: "전체 계획 / 할 일", count: tasks.length, filter: "all" },
+    { title: "완료", count: tasks.filter(task => task.status === "done").length, filter: "done" },
+    { title: "지연", count: tasks.filter(task => task.status !== "done" && task.deadline < today).length, filter: "delay" },
+    { title: "막힘", count: tasks.filter(isTaskBlocked).length, filter: "blocked" }
+  ];
+
+  groups.forEach(group => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f1f2;";
+    row.innerHTML = `
+      <div>
+        <strong style="display:block;font-size:12px;color:#555b65;">${group.title}</strong>
+        <span style="display:block;margin-top:4px;color:#9a9fa7;font-size:10px;">이 숫자에 포함된 기록을 확인합니다.</span>
+      </div>
+      <button class="btn btn-light" onclick="goTasks('${group.filter}')">${group.count}건 보기 →</button>
+    `;
+    box.appendChild(row);
+  });
+
+  const recentExecutions = executions.filter(execution => !execution.completion).slice().reverse().slice(0, 5);
+
+  if (recentExecutions.length) {
+    const subheading = document.createElement("div");
+    subheading.style.cssText = "display:flex; align-items:center; gap:8px; margin:18px 0 4px;";
+    subheading.innerHTML = `<span style="font-size:10px; font-weight:700; color:var(--sub); letter-spacing:0.5px;">최근 실행 기록</span><span style="flex:1; height:1px; background:var(--line);"></span>`;
+    box.appendChild(subheading);
+
+    recentExecutions.forEach(execution => {
+      const task = data.tasks.find(task => task.id === execution.taskId);
+      const row = document.createElement("div");
+      row.style.cssText = "padding:12px 0;border-bottom:1px solid #f0f1f2;";
+      row.innerHTML = `
+        <strong style="display:block;font-size:12px;">${task ? escapeHTML(task.title) : "삭제된 할 일"}</strong>
+        <span style="display:block;margin-top:4px;color:#8c929b;font-size:10px;">실제 ${formatMinutes(execution.actualMinutes)}${execution.blockedReason ? ` · 막힘: ${escapeHTML(execution.blockedReason)}` : ""}</span>
+      `;
+      box.appendChild(row);
+    });
+  }
+}
+
+
+/* Next Plan */
+async function saveNextPlan() {
+  const value = document.getElementById("nextPlanInput").value.trim();
+  if (!value) { showToast("다음 계획으로 넘길 내용을 적어주세요."); return; }
+
+  try {
+    throwIfError((await sb.from("next_plan").update({ text: value }).eq("id", 1)).error);
+    document.getElementById("nextPlanInput").value = "";
+    await refreshAndRender();
+    showToast("개선점이 다음 계획으로 넘어갔습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+function renderNextPlan() {
+  const box = document.getElementById("nextPlanBox");
+  if (data.nextPlan) {
+    box.innerHTML = `<div style="background:#d9eeea;border-radius:15px;padding:13px;color:#587f77;"><strong style="display:block;font-size:11px;">다음 계획</strong><p style="margin-top:5px;">${escapeHTML(data.nextPlan)}</p></div>`;
+  } else {
+    box.textContent = "아직 전달된 개선점이 없습니다.";
+  }
+}
+
+/* 돌아보기에서 정한 고칠 점을 실제 새 계획 초안으로 전환 (T06-C33) */
+function createPlanFromNextPlan() {
+  if (!data.nextPlan) { showToast("아직 정한 개선점이 없습니다. See에서 먼저 정해주세요."); return; }
+  openPlanModal();
+  document.getElementById("planTitle").value = data.nextPlan;
+  document.getElementById("planSuccess").value = data.nextPlan;
+  showToast("고칠 점을 새 계획 초안에 채워넣었어요. 나머지 항목을 채우고 저장하세요.");
+}
+
+
+/* Calendar */
+function renderCalendar() {
+  const container = document.getElementById("calendarDays");
+  container.innerHTML = "";
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+
+  document.getElementById("calendarMonth").textContent = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(calendarMonth);
+
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const start = first.getDay() === 0 ? 6 : first.getDay() - 1;
+
+  for (let i = 0; i < start; i++) {
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    container.appendChild(empty);
+  }
+
+  for (let day = 1; day <= last.getDate(); day++) {
+    const date = new Date(year, month, day);
+    const dateString = formatDateInput(date);
+    const element = document.createElement("div");
+    element.className = "day";
+    element.textContent = day;
+
+    if (isSameDate(date, new Date())) element.classList.add("today");
+    if (isSameDate(date, selectedCalendarDate)) element.classList.add("selected");
+
+    const hasPlan = data.tasks.some(task => task.deadline === dateString);
+    if (hasPlan) element.classList.add("has-plan");
+
+    element.onclick = () => { selectedCalendarDate = date; renderDashboard(); };
+    container.appendChild(element);
+  }
+}
+
+function changeCalendarMonth(direction) {
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + direction, 1);
+  renderCalendar();
+}
+
+
+/* Modal */
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+document.querySelectorAll(".modal-overlay").forEach(overlay => {
+  overlay.addEventListener("click", event => { if (event.target === overlay) overlay.classList.remove("open"); });
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") document.querySelectorAll(".modal-overlay.open").forEach(modal => modal.classList.remove("open"));
+});
+
+
+/* Export — 서버에 있는 실제 데이터를 그대로 내보낸다 */
+async function exportData() {
+  try {
+    const [plansRes, tasksRes, execRes, npRes] = await Promise.all([
+      sb.from("plans").select("*"),
+      sb.from("tasks").select("*"),
+      sb.from("executions").select("*"),
+      sb.from("next_plan").select("text").eq("id", 1).single()
+    ]);
+    throwIfError(plansRes.error); throwIfError(tasksRes.error);
+    throwIfError(execRes.error); throwIfError(npRes.error);
+
+    const output = {
+      exportedAt: new Date().toISOString(),
+      version: "pds-schema-v2",
+      data: { plans: plansRes.data, tasks: tasksRes.data, executions: execRes.data, nextPlan: npRes.data?.text ?? "" }
+    };
+
+    const blob = new Blob([JSON.stringify(output, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `pds-diary-${seoulTodayString()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast("데이터를 JSON 파일로 내보냈습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Reset — 서버에 저장된 데이터를 전부 지운다 (CASCADE로 관련 행 모두 삭제) */
+async function resetData() {
+  if (!confirm("서버에 저장된 모든 계획, 할 일, 실행 기록을 초기화할까요?")) return;
+
+  try {
+    throwIfError((await sb.from("plans").delete().neq("id", 0)).error);
+    throwIfError((await sb.from("next_plan").update({ text: "" }).eq("id", 1)).error);
+    await refreshAndRender();
+    showToast("데이터가 초기화되었습니다.");
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+
+/* Storage Status */
+function updateStorageStatus() {
+  const element = document.getElementById("storageStatus");
+  if (!element) return;
+  element.innerHTML = `현재 데이터는 서버 데이터베이스(Supabase Postgres)에 저장되어 있습니다.<br><br>프로젝트 주소: <strong>${escapeHTML(SUPABASE_URL)}</strong>`;
+}
+
+
+/* Utilities */
+function formatDateInput(date) {
+  const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, "0"), d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function formatDate(dateString) {
+  if (!dateString) return "-";
+  const [y, m, d] = dateString.split("-");
+  return `${y}.${m}.${d}`;
+}
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2,"0")}.${String(date.getDate()).padStart(2,"0")} ${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
+}
+function toDateTimeLocal(date) {
+  const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, "0"), d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0"), min = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+function formatMinutes(minutes) {
+  minutes = Number(minutes || 0);
+  if (minutes < 60) return `${minutes}분`;
+  const hours = Math.floor(minutes / 60), rest = minutes % 60;
+  return rest ? `${hours}시간 ${rest}분` : `${hours}시간`;
+}
+function priorityText(priority) { return { high: "높음", medium: "보통", low: "낮음" }[priority] || "보통"; }
+function isSameDate(a,b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+function truncateText(text, max = 30) {
+  if (!text) return text;
+  return text.length > max ? text.slice(0, max) + "…" : text;
+}
+function escapeHTML(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+function emptyHTML(title, text) {
+  return `<div class="empty-state"><strong>${escapeHTML(title)}</strong><p>${escapeHTML(text)}</p></div>`;
+}
+
+
+/* Toast */
+let toastTimer;
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+
+/* Initialize */
+async function initialize() {
+  try {
+    await refreshAll();
+  } catch (e) {
+    showToast("서버(Supabase)에 연결하지 못했습니다: " + e.message);
+  }
+  renderCurrentPage();
+}
+initialize();
+
+
+</script>
+
+</body>
+</html>
