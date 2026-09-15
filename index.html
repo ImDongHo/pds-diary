@@ -2305,7 +2305,7 @@ async function resetData() {
 function updateStorageStatus() {
   const element = document.getElementById("storageStatus");
   if (!element) return;
-  element.innerHTML = `현재 데이터는 서버 데이터베이스(Supabase Postgres)에 저장되어 있습니다.<br><br>프로젝트 주소: <strong>${escapeHTML(SUPABASE_URL)}</strong>`;
+  element.innerHTML = `서버 데이터베이스(Supabase Postgres)에 저장되어 있습니다.`;
 }
 
 
