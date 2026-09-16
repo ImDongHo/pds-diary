@@ -61,7 +61,7 @@ input, textarea, select { outline: none; }
 .page-title p { margin-top: 5px; color: var(--sub); font-size: 13px; }
 .page-actions { display: flex; gap: 8px; }
 
-.btn { min-height: 40px; padding: 0 15px; border-radius: 13px; font-size: 12px; font-weight: 600; transition: 0.2s; }
+.btn { min-height: 40px; padding: 0 15px; border-radius: 13px; font-size: 12px; font-weight: 600; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
 .btn-gray { background: var(--gray); color: white; }
 .btn-gray:hover { background: var(--dark-gray); }
 .btn-light { background: white; color: #5d6470; border: 1px solid var(--line); }
@@ -299,13 +299,46 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
   transform: scale(0.97);
 }
 
+.auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.auth-box { width: 100%; max-width: 360px; background: white; border-radius: 28px; padding: 34px 28px; box-shadow: var(--shadow); text-align: center; }
+.auth-logo { width: 48px; height: 48px; margin: 0 auto 14px; background: var(--gray); color: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; }
+.auth-box h1 { font-size: 21px; letter-spacing: -0.5px; }
+.auth-sub { margin-top: 6px; color: var(--sub); font-size: 12px; }
+.auth-tabs { display: flex; gap: 6px; background: #f2f3f4; border-radius: 14px; padding: 4px; margin: 20px 0 16px; }
+.auth-tab { flex: 1; height: 36px; border-radius: 11px; background: transparent; color: var(--sub); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; }
+.auth-tab.active { background: white; color: var(--text); box-shadow: 0 2px 8px rgba(31,40,55,0.08); }
+.auth-box .form-group { margin-bottom: 12px; text-align: left; }
+.auth-error { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #faeeee; color: var(--red-dark); font-size: 11.5px; line-height: 1.5; text-align: left; }
+.auth-hint { margin-top: 14px; color: var(--sub); font-size: 11px; line-height: 1.6; }
+
 </style>
 </head>
 
 
 <body>
 
-<div class="app">
+<!-- AUTH SCREEN — 로그인하지 않았으면 이 화면만 보인다 (T07-C03, T07-C97) -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">PDS</div>
+    <h1>PDS Diary</h1>
+    <p class="auth-sub">계획하고 실행한 걸 나만 보게 기록해요.</p>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="authTabSignin" onclick="setAuthMode('signin')">로그인</button>
+      <button type="button" class="auth-tab" id="authTabSignup" onclick="setAuthMode('signup')">회원가입</button>
+    </div>
+    <form id="authForm" onsubmit="handleAuthSubmit(event)">
+      <div class="form-group full"><label class="form-label">이메일</label><input id="authEmail" class="input" type="email" required autocomplete="email"></div>
+      <div class="form-group full"><label class="form-label">비밀번호 (6자 이상)</label><input id="authPassword" class="input" type="password" required minlength="6" autocomplete="current-password"></div>
+      <button type="submit" class="btn btn-gray" id="authSubmitBtn" style="width:100%;margin-top:4px;">로그인</button>
+    </form>
+    <div class="auth-error hidden" id="authError"></div>
+    <p class="auth-hint" id="authHint">가입한 이메일과 비밀번호로 로그인하세요. 아이디가 없거나 비밀번호가 틀려도 안내 문구는 같습니다.</p>
+  </div>
+</div>
+
+
+<div class="app hidden" id="appRoot">
 
   <aside class="sidebar">
     <div class="logo">PDS</div>
@@ -331,12 +364,13 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
       </div>
       <div class="top-right">
         <div class="date-chip" id="currentDate">2026년 9월 8일 · 화요일</div>
-        <div class="profile">P</div>
+        <button class="btn btn-light" onclick="handleSignOut()" title="로그아웃" style="min-height:36px;padding:0 14px;">로그아웃</button>
+        <div class="profile" id="profileInitial">P</div>
       </div>
     </header>
 
     <div class="notice">
-      <span>지금은 로그인이 없어 링크를 아는 사람은 누구나 볼 수 있습니다. 남이 봐도 괜찮은 내용만 넣으세요.</span>
+      <span>로그인한 계정에만 보이는 내 기록입니다. 다른 사람은 로그인하지 않고는 볼 수 없습니다.</span>
       <button onclick="this.parentElement.remove()">닫기</button>
     </div>
 
@@ -673,13 +707,22 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
 
         <div class="setting-card">
           <h3>공개 상태</h3>
-          <p>로그인 기능이 없기 때문에 링크를 아는 사람은 누구나 현재 데이터를 볼 수 있습니다.</p>
-          <div class="warning-box">남이 봐도 괜찮은 내용만 기록하세요. 다른 사람의 이름, 연락처 등 개인정보는 넣지 않는 것을 권장합니다.</div>
+          <p>로그인한 사람만 자기 자료를 볼 수 있습니다. 로그인하지 않고 자료 화면 주소로 들어오면 로그인 화면이 나오고, 다른 계정의 자료는 서버(RLS)가 막아서 애초에 응답에 담기지 않습니다.</p>
+          <div class="warning-box" id="accountEmail">로그인 계정: -</div>
+        </div>
+
+        <div class="setting-card">
+          <h3>계정</h3>
+          <p>로그아웃하거나, 계정을 완전히 삭제할 수 있습니다. 계정을 삭제하면 이 계정에 저장된 계획/할 일/실행 기록도 함께 삭제됩니다.</p>
+          <div class="setting-buttons">
+            <button class="btn btn-light" onclick="handleSignOut()">로그아웃</button>
+            <button class="btn btn-danger" onclick="handleDeleteAccount()">계정 삭제</button>
+          </div>
         </div>
 
         <div class="setting-card">
           <h3>테스트 데이터</h3>
-          <p>과제를 처음부터 다시 테스트하고 싶다면 서버에 저장된 데이터를 초기화할 수 있습니다.</p>
+          <p>과제를 처음부터 다시 테스트하고 싶다면 내 계정에 저장된 데이터를 초기화할 수 있습니다.</p>
           <div class="setting-buttons"><button class="btn btn-danger" onclick="resetData()">전체 데이터 초기화</button></div>
         </div>
       </div>
@@ -833,6 +876,116 @@ function mapExecutionRow(r) {
     blockedReason: r.blocked_reason, memo: r.memo, completion: r.completion, createdAt: r.created_at };
 }
 
+
+/* =====================================================
+   인증 (7번 과제)
+   가입/로그인/로그아웃/계정삭제 + 로그인 상태에 따른 화면 전환.
+   "아이디는 있는데 비번만 틀림"과 "아이디 자체 없음"의 안내 문구가
+   같아야 하므로(T07-C99), Supabase가 돌려주는 에러 메시지를 그대로
+   보여주고 우리 쪽에서 따로 구분하는 로직을 추가하지 않는다.
+===================================================== */
+let currentUser = null;
+let authMode = "signin";
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById("authTabSignin").classList.toggle("active", mode === "signin");
+  document.getElementById("authTabSignup").classList.toggle("active", mode === "signup");
+  document.getElementById("authSubmitBtn").textContent = mode === "signin" ? "로그인" : "회원가입";
+  document.getElementById("authPassword").setAttribute("autocomplete", mode === "signin" ? "current-password" : "new-password");
+  document.getElementById("authHint").textContent = mode === "signin"
+    ? "가입한 이메일과 비밀번호로 로그인하세요. 아이디가 없거나 비밀번호가 틀려도 안내 문구는 같습니다."
+    : "이미 가입된 이메일로는 다시 가입할 수 없습니다.";
+  hideAuthError();
+}
+
+function showAuthError(message) {
+  const el = document.getElementById("authError");
+  el.textContent = message;
+  el.classList.remove("hidden");
+}
+function hideAuthError() {
+  document.getElementById("authError").classList.add("hidden");
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  hideAuthError();
+
+  const btn = document.getElementById("authSubmitBtn");
+  btn.disabled = true;
+  try {
+    if (authMode === "signup") {
+      const { data: signUpData, error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      if (signUpData?.session) {
+        // 이메일 확인이 꺼져 있으면 가입과 동시에 로그인됨 — onAuthStateChange가 화면을 넘긴다
+      } else {
+        showAuthError("가입 확인 메일을 보냈어요. 메일함을 확인한 뒤 로그인해주세요.");
+        setAuthMode("signin");
+      }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      // 성공하면 onAuthStateChange가 앱 화면으로 넘긴다
+    }
+  } catch (e) {
+    showAuthError(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handleSignOut() {
+  await sb.auth.signOut();
+}
+
+async function handleDeleteAccount() {
+  if (!confirm("계정을 삭제하면 저장된 모든 계획·할 일·실행 기록이 함께 삭제됩니다. 되돌릴 수 없습니다. 진행할까요?")) return;
+  try {
+    const { error } = await sb.rpc("delete_own_account");
+    if (error) throw error;
+    await sb.auth.signOut();
+  } catch (e) {
+    showToast("계정 삭제에 실패했습니다: " + e.message);
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById("authScreen").classList.remove("hidden");
+  document.getElementById("appRoot").classList.add("hidden");
+  document.getElementById("authForm").reset();
+  setAuthMode("signin");
+}
+
+async function showAppScreen(user) {
+  currentUser = user;
+  document.getElementById("authScreen").classList.add("hidden");
+  document.getElementById("appRoot").classList.remove("hidden");
+  const profileEl = document.getElementById("profileInitial");
+  if (profileEl) profileEl.textContent = (user.email || "P")[0].toUpperCase();
+  const accountEl = document.getElementById("accountEmail");
+  if (accountEl) accountEl.textContent = `로그인 계정: ${user.email}`;
+  try {
+    await refreshAll();
+  } catch (e) {
+    showToast("서버(Supabase)에 연결하지 못했습니다: " + e.message);
+  }
+  renderCurrentPage();
+}
+
+sb.auth.onAuthStateChange((_event, session) => {
+  if (session?.user) {
+    showAppScreen(session.user);
+  } else {
+    currentUser = null;
+    showAuthScreen();
+  }
+});
+
+
 let data = { plans: [], tasks: [], executions: [], nextPlan: "" };
 let selectedCalendarDate = new Date();
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -858,7 +1011,7 @@ async function refreshAll() {
     sb.from("plans").select("*").order("id"),
     sb.from("tasks").select("*").order("id"),
     sb.from("executions").select("*").order("id"),
-    sb.from("next_plan").select("text").eq("id", 1).single()
+    sb.from("next_plan").select("text").eq("user_id", currentUser.id).maybeSingle()
   ]);
   throwIfError(plansRes.error);
   throwIfError(tasksRes.error);
@@ -2172,7 +2325,7 @@ async function saveNextPlan() {
   if (!value) { showToast("다음 계획으로 넘길 내용을 적어주세요."); return; }
 
   try {
-    throwIfError((await sb.from("next_plan").update({ text: value }).eq("id", 1)).error);
+    throwIfError((await sb.from("next_plan").upsert({ user_id: currentUser.id, text: value }, { onConflict: "user_id" })).error);
     document.getElementById("nextPlanInput").value = "";
     await refreshAndRender();
     showToast("개선점이 다음 계획으로 넘어갔습니다.");
@@ -2262,7 +2415,7 @@ async function exportData() {
       sb.from("plans").select("*"),
       sb.from("tasks").select("*"),
       sb.from("executions").select("*"),
-      sb.from("next_plan").select("text").eq("id", 1).single()
+      sb.from("next_plan").select("text").eq("user_id", currentUser.id).maybeSingle()
     ]);
     throwIfError(plansRes.error); throwIfError(tasksRes.error);
     throwIfError(execRes.error); throwIfError(npRes.error);
@@ -2292,7 +2445,7 @@ async function resetData() {
 
   try {
     throwIfError((await sb.from("plans").delete().neq("id", 0)).error);
-    throwIfError((await sb.from("next_plan").update({ text: "" }).eq("id", 1)).error);
+    throwIfError((await sb.from("next_plan").delete().eq("user_id", currentUser.id)).error);
     await refreshAndRender();
     showToast("데이터가 초기화되었습니다.");
   } catch (e) {
@@ -2361,16 +2514,7 @@ function showToast(message) {
 }
 
 
-/* Initialize */
-async function initialize() {
-  try {
-    await refreshAll();
-  } catch (e) {
-    showToast("서버(Supabase)에 연결하지 못했습니다: " + e.message);
-  }
-  renderCurrentPage();
-}
-initialize();
+/* Initialize — 로그인 상태 확인/화면 전환은 위쪽 onAuthStateChange가 맡는다 */
 
 
 </script>
