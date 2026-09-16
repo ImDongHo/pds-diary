@@ -94,6 +94,17 @@ create policy "own_next_plan" on next_plan for all using (auth.uid() = user_id) 
 
 
 -- =====================================================
+-- 5-1단계. 테이블 권한(GRANT) — RLS와는 별개로, authenticated 역할이
+-- 이 테이블들에 접근할 수 있다는 기본 권한 자체가 있어야 한다. 6번
+-- 과제 때는 anon 키로만 썼어서 이 권한이 없어도 문제가 안 드러났지만,
+-- 로그인하면 요청 역할이 authenticated로 바뀌면서 이게 없으면
+-- "permission denied for table ..." 에러가 난다.
+-- =====================================================
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on plans, plan_history, tasks, executions, next_plan to authenticated;
+
+
+-- =====================================================
 -- 6단계. 계정 삭제 함수 (T07-C134) — index.html의 "계정 삭제" 버튼이
 -- supabase.rpc('delete_own_account')로 이 함수를 부른다.
 -- =====================================================
