@@ -962,20 +962,40 @@ async function handleDeleteAccount() {
    이 타이머는 그거랑 무관하게 독립적으로 흐르다가 0이 되면 signOut()을
    직접 호출해 강제로 끊는다. */
 const APP_SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 연장하지 않으면 로그아웃되기까지의 시간
+const SESSION_DEADLINE_KEY = "pds_diary_session_deadline";
 let sessionDeadline = null;
 let sessionTimerInterval = null;
+
+/* 만료 시각을 localStorage에 저장해서, 새로고침/재접속해도 "처음부터 15분"이
+   아니라 "이어서" 카운트되게 한다. 여기 저장을 안 하면, 새로고침만 계속
+   해도 로그아웃을 영원히 피할 수 있는 구멍이 생긴다. */
+function persistSessionDeadline(deadline) {
+  try { localStorage.setItem(SESSION_DEADLINE_KEY, String(deadline)); } catch (_) {}
+}
+function readSessionDeadline() {
+  try {
+    const v = localStorage.getItem(SESSION_DEADLINE_KEY);
+    return v ? Number(v) : null;
+  } catch (_) { return null; }
+}
+function clearSessionDeadline() {
+  try { localStorage.removeItem(SESSION_DEADLINE_KEY); } catch (_) {}
+}
 
 function stopSessionCountdown() {
   clearInterval(sessionTimerInterval);
   sessionTimerInterval = null;
   sessionDeadline = null;
+  clearSessionDeadline();
   const el = document.getElementById("sessionCountdown");
   const btn = document.getElementById("sessionExtendBtn");
   if (el) el.classList.add("hidden");
   if (btn) btn.classList.add("hidden");
 }
 
-function startSessionCountdown() {
+/* existingDeadline을 넘기면(아직 안 지난 값이면) 그 시각을 그대로 이어서
+   쓰고, 안 넘기거나 이미 지난 값이면 지금부터 새로 15분을 잰다. */
+function startSessionCountdown(existingDeadline) {
   const el = document.getElementById("sessionCountdown");
   const timeEl = document.getElementById("sessionCountdownTime");
   const btn = document.getElementById("sessionExtendBtn");
@@ -983,7 +1003,10 @@ function startSessionCountdown() {
   el.classList.remove("hidden");
   if (btn) btn.classList.remove("hidden");
   clearInterval(sessionTimerInterval);
-  sessionDeadline = Date.now() + APP_SESSION_TIMEOUT_MS;
+  sessionDeadline = (existingDeadline && existingDeadline > Date.now())
+    ? existingDeadline
+    : Date.now() + APP_SESSION_TIMEOUT_MS;
+  persistSessionDeadline(sessionDeadline);
 
   function tick() {
     const remainingMs = sessionDeadline - Date.now();
@@ -996,20 +1019,21 @@ function startSessionCountdown() {
       : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     if (remainingMs <= 0) {
       clearInterval(sessionTimerInterval);
-      sb.auth.signOut(); // 연장 안 하면 여기서 강제 로그아웃 (onAuthStateChange가 화면 전환까지 처리)
+      clearSessionDeadline();
+      sb.auth.signOut().catch(() => {}); // 연장 안 하면 여기서 강제 로그아웃 (onAuthStateChange가 화면 전환까지 처리)
     }
   }
   tick();
   sessionTimerInterval = setInterval(tick, 1000);
 }
 
-/* 세션 연장 — 앱 타이머를 다시 처음부터 시작한다. JWT 자체도 같이 갱신을
-   시도해두면(실패해도 무방) 다음 요청들이 끊기지 않는다. */
+/* 세션 연장 — 앱 타이머를 다시 처음부터(15분) 시작한다. JWT 자체도 같이
+   갱신을 시도해두면(실패해도 무방) 다음 요청들이 끊기지 않는다. */
 async function handleExtendSession() {
   const btn = document.getElementById("sessionExtendBtn");
   btn.disabled = true;
   try {
-    startSessionCountdown();
+    startSessionCountdown(); // 인자 없이 호출 → 무조건 새로 15분
     try { await sb.auth.refreshSession(); } catch (_) { /* 실패해도 앱 타이머는 이미 연장됨 */ }
     showToast("세션을 연장했습니다.");
   } finally {
@@ -1034,7 +1058,7 @@ async function showAppScreen(session) {
   if (profileEl) profileEl.textContent = (user.email || "P")[0].toUpperCase();
   const accountEl = document.getElementById("accountEmail");
   if (accountEl) accountEl.textContent = `로그인 계정: ${user.email}`;
-  startSessionCountdown();
+  startSessionCountdown(readSessionDeadline()); // 저장된 만료 시각이 있으면 이어서, 없으면 새로 시작
   try {
     await refreshAll();
   } catch (e) {
@@ -1048,6 +1072,14 @@ sb.auth.onAuthStateChange((event, session) => {
     if (event === "TOKEN_REFRESHED") {
       // JWT가 백그라운드에서 갱신된 것 — 화면의 앱 타이머(sessionDeadline)와는
       // 무관하므로 아무 동작도 하지 않는다.
+      return;
+    }
+    // 저장된 만료 시각이 이미 지났으면(자리를 비운 사이 시간이 다 됐으면)
+    // 새로고침으로 몰래 연장되지 않도록, 화면을 띄우지 말고 바로 로그아웃시킨다.
+    const stored = readSessionDeadline();
+    if (stored && stored <= Date.now()) {
+      clearSessionDeadline();
+      sb.auth.signOut().catch(() => {});
       return;
     }
     showAppScreen(session);
