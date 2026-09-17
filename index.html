@@ -364,6 +364,7 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
       </div>
       <div class="top-right">
         <div class="date-chip" id="currentDate">2026년 9월 8일 · 화요일</div>
+        <div class="date-chip hidden" id="sessionCountdown" title="로그인 세션(JWT) 만료까지 남은 시간">세션 만료까지 --:--</div>
         <button class="btn btn-light" onclick="handleSignOut()" title="로그아웃" style="min-height:36px;padding:0 14px;">로그아웃</button>
         <div class="profile" id="profileInitial">P</div>
       </div>
@@ -953,14 +954,49 @@ async function handleDeleteAccount() {
   }
 }
 
+/* 세션 만료 카운트다운 — T07-C111(만료 시각 표시) 증거용.
+   supabase-js가 만료 전에 백그라운드에서 자동 갱신하므로, 탭을 열어두고
+   쓰는 동안은 이 숫자가 0에 도달하지 않고 갱신될 때마다 다시 채워진다. */
+let sessionTimerInterval = null;
+
+function stopSessionCountdown() {
+  clearInterval(sessionTimerInterval);
+  sessionTimerInterval = null;
+  const el = document.getElementById("sessionCountdown");
+  if (el) el.classList.add("hidden");
+}
+
+function startSessionCountdown(expiresAtSeconds) {
+  const el = document.getElementById("sessionCountdown");
+  if (!el || !expiresAtSeconds) return;
+  el.classList.remove("hidden");
+  clearInterval(sessionTimerInterval);
+
+  function tick() {
+    const remaining = Math.max(0, Math.floor(expiresAtSeconds - Date.now() / 1000));
+    const h = Math.floor(remaining / 3600);
+    const m = Math.floor((remaining % 3600) / 60);
+    const s = remaining % 60;
+    const label = h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    el.textContent = `세션 만료까지 ${label}`;
+    if (remaining <= 0) clearInterval(sessionTimerInterval);
+  }
+  tick();
+  sessionTimerInterval = setInterval(tick, 1000);
+}
+
 function showAuthScreen() {
   document.getElementById("authScreen").classList.remove("hidden");
   document.getElementById("appRoot").classList.add("hidden");
   document.getElementById("authForm").reset();
   setAuthMode("signin");
+  stopSessionCountdown();
 }
 
-async function showAppScreen(user) {
+async function showAppScreen(session) {
+  const user = session.user;
   currentUser = user;
   document.getElementById("authScreen").classList.add("hidden");
   document.getElementById("appRoot").classList.remove("hidden");
@@ -968,6 +1004,7 @@ async function showAppScreen(user) {
   if (profileEl) profileEl.textContent = (user.email || "P")[0].toUpperCase();
   const accountEl = document.getElementById("accountEmail");
   if (accountEl) accountEl.textContent = `로그인 계정: ${user.email}`;
+  startSessionCountdown(session.expires_at);
   try {
     await refreshAll();
   } catch (e) {
@@ -976,9 +1013,13 @@ async function showAppScreen(user) {
   renderCurrentPage();
 }
 
-sb.auth.onAuthStateChange((_event, session) => {
+sb.auth.onAuthStateChange((event, session) => {
   if (session?.user) {
-    showAppScreen(session.user);
+    if (event === "TOKEN_REFRESHED") {
+      startSessionCountdown(session.expires_at);
+    } else {
+      showAppScreen(session);
+    }
   } else {
     currentUser = null;
     showAuthScreen();
