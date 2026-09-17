@@ -365,8 +365,8 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
       </div>
       <div class="top-right">
         <div class="date-chip" id="currentDate">2026년 9월 8일 · 화요일</div>
-        <div class="date-chip hidden" id="sessionCountdown" title="로그인 세션(JWT) 만료까지 남은 시간">세션 만료까지 <span class="session-time" id="sessionCountdownTime">--:--</span></div>
-        <button class="btn btn-light hidden" id="sessionExtendBtn" onclick="handleExtendSession()" title="지금 바로 세션을 갱신합니다" style="min-height:36px;padding:0 12px;">연장</button>
+        <div class="date-chip hidden" id="sessionCountdown" title="연장하지 않으면 이 시간 뒤 자동 로그아웃됩니다">세션 만료까지 <span class="session-time" id="sessionCountdownTime">--:--</span></div>
+        <button class="btn btn-light hidden" id="sessionExtendBtn" onclick="handleExtendSession()" title="세션을 15분 연장합니다" style="min-height:36px;padding:0 12px;">연장</button>
         <button class="btn btn-light" onclick="handleSignOut()" title="로그아웃" style="min-height:36px;padding:0 14px;">로그아웃</button>
         <div class="profile" id="profileInitial">P</div>
       </div>
@@ -956,54 +956,62 @@ async function handleDeleteAccount() {
   }
 }
 
-/* 세션 만료 카운트다운 — T07-C111(만료 시각 표시) 증거용.
-   supabase-js가 만료 전에 백그라운드에서 자동 갱신하므로, 탭을 열어두고
-   쓰는 동안은 이 숫자가 0에 도달하지 않고 갱신될 때마다 다시 채워진다. */
+/* 앱 자체 세션 타이머 — JWT의 자동 갱신(auto refresh)과는 완전히 분리된,
+   "연장 버튼을 누르지 않으면 이 시간 뒤 무조건 로그아웃"용 타이머.
+   JWT는 백그라운드에서 계속 자동 갱신되지만(그래서 로그인이 안 끊기지만),
+   이 타이머는 그거랑 무관하게 독립적으로 흐르다가 0이 되면 signOut()을
+   직접 호출해 강제로 끊는다. */
+const APP_SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 연장하지 않으면 로그아웃되기까지의 시간
+let sessionDeadline = null;
 let sessionTimerInterval = null;
 
 function stopSessionCountdown() {
   clearInterval(sessionTimerInterval);
   sessionTimerInterval = null;
+  sessionDeadline = null;
   const el = document.getElementById("sessionCountdown");
   const btn = document.getElementById("sessionExtendBtn");
   if (el) el.classList.add("hidden");
   if (btn) btn.classList.add("hidden");
 }
 
-function startSessionCountdown(expiresAtSeconds) {
+function startSessionCountdown() {
   const el = document.getElementById("sessionCountdown");
   const timeEl = document.getElementById("sessionCountdownTime");
   const btn = document.getElementById("sessionExtendBtn");
-  if (!el || !timeEl || !expiresAtSeconds) return;
+  if (!el || !timeEl) return;
   el.classList.remove("hidden");
   if (btn) btn.classList.remove("hidden");
   clearInterval(sessionTimerInterval);
+  sessionDeadline = Date.now() + APP_SESSION_TIMEOUT_MS;
 
   function tick() {
-    const remaining = Math.max(0, Math.floor(expiresAtSeconds - Date.now() / 1000));
+    const remainingMs = sessionDeadline - Date.now();
+    const remaining = Math.max(0, Math.floor(remainingMs / 1000));
     const h = Math.floor(remaining / 3600);
     const m = Math.floor((remaining % 3600) / 60);
     const s = remaining % 60;
     timeEl.textContent = h > 0
       ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
       : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    if (remaining <= 0) clearInterval(sessionTimerInterval);
+    if (remainingMs <= 0) {
+      clearInterval(sessionTimerInterval);
+      sb.auth.signOut(); // 연장 안 하면 여기서 강제 로그아웃 (onAuthStateChange가 화면 전환까지 처리)
+    }
   }
   tick();
   sessionTimerInterval = setInterval(tick, 1000);
 }
 
-/* 세션 연장 — 만료 시각과 무관하게 지금 바로 새 토큰을 발급받는다.
-   성공하면 onAuthStateChange가 TOKEN_REFRESHED 이벤트로 카운트다운을 다시 시작해준다. */
+/* 세션 연장 — 앱 타이머를 다시 처음부터 시작한다. JWT 자체도 같이 갱신을
+   시도해두면(실패해도 무방) 다음 요청들이 끊기지 않는다. */
 async function handleExtendSession() {
   const btn = document.getElementById("sessionExtendBtn");
   btn.disabled = true;
   try {
-    const { error } = await sb.auth.refreshSession();
-    if (error) throw error;
+    startSessionCountdown();
+    try { await sb.auth.refreshSession(); } catch (_) { /* 실패해도 앱 타이머는 이미 연장됨 */ }
     showToast("세션을 연장했습니다.");
-  } catch (e) {
-    showToast("세션 연장에 실패했습니다: " + e.message);
   } finally {
     btn.disabled = false;
   }
@@ -1026,7 +1034,7 @@ async function showAppScreen(session) {
   if (profileEl) profileEl.textContent = (user.email || "P")[0].toUpperCase();
   const accountEl = document.getElementById("accountEmail");
   if (accountEl) accountEl.textContent = `로그인 계정: ${user.email}`;
-  startSessionCountdown(session.expires_at);
+  startSessionCountdown();
   try {
     await refreshAll();
   } catch (e) {
@@ -1038,10 +1046,11 @@ async function showAppScreen(session) {
 sb.auth.onAuthStateChange((event, session) => {
   if (session?.user) {
     if (event === "TOKEN_REFRESHED") {
-      startSessionCountdown(session.expires_at);
-    } else {
-      showAppScreen(session);
+      // JWT가 백그라운드에서 갱신된 것 — 화면의 앱 타이머(sessionDeadline)와는
+      // 무관하므로 아무 동작도 하지 않는다.
+      return;
     }
+    showAppScreen(session);
   } else {
     currentUser = null;
     showAuthScreen();
