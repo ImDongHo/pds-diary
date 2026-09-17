@@ -310,6 +310,7 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
 .auth-box .form-group { margin-bottom: 12px; text-align: left; }
 .auth-error { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #faeeee; color: var(--red-dark); font-size: 11.5px; line-height: 1.5; text-align: left; }
 .auth-hint { margin-top: 14px; color: var(--sub); font-size: 11px; line-height: 1.6; }
+.session-time { font-weight: 800; color: var(--text); }
 
 </style>
 </head>
@@ -364,7 +365,8 @@ textarea.input { height: 90px; padding: 12px; resize: vertical; }
       </div>
       <div class="top-right">
         <div class="date-chip" id="currentDate">2026년 9월 8일 · 화요일</div>
-        <div class="date-chip hidden" id="sessionCountdown" title="로그인 세션(JWT) 만료까지 남은 시간">세션 만료까지 --:--</div>
+        <div class="date-chip hidden" id="sessionCountdown" title="로그인 세션(JWT) 만료까지 남은 시간">세션 만료까지 <span class="session-time" id="sessionCountdownTime">--:--</span></div>
+        <button class="btn btn-light hidden" id="sessionExtendBtn" onclick="handleExtendSession()" title="지금 바로 세션을 갱신합니다" style="min-height:36px;padding:0 12px;">연장</button>
         <button class="btn btn-light" onclick="handleSignOut()" title="로그아웃" style="min-height:36px;padding:0 14px;">로그아웃</button>
         <div class="profile" id="profileInitial">P</div>
       </div>
@@ -963,13 +965,18 @@ function stopSessionCountdown() {
   clearInterval(sessionTimerInterval);
   sessionTimerInterval = null;
   const el = document.getElementById("sessionCountdown");
+  const btn = document.getElementById("sessionExtendBtn");
   if (el) el.classList.add("hidden");
+  if (btn) btn.classList.add("hidden");
 }
 
 function startSessionCountdown(expiresAtSeconds) {
   const el = document.getElementById("sessionCountdown");
-  if (!el || !expiresAtSeconds) return;
+  const timeEl = document.getElementById("sessionCountdownTime");
+  const btn = document.getElementById("sessionExtendBtn");
+  if (!el || !timeEl || !expiresAtSeconds) return;
   el.classList.remove("hidden");
+  if (btn) btn.classList.remove("hidden");
   clearInterval(sessionTimerInterval);
 
   function tick() {
@@ -977,14 +984,29 @@ function startSessionCountdown(expiresAtSeconds) {
     const h = Math.floor(remaining / 3600);
     const m = Math.floor((remaining % 3600) / 60);
     const s = remaining % 60;
-    const label = h > 0
+    timeEl.textContent = h > 0
       ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
       : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    el.textContent = `세션 만료까지 ${label}`;
     if (remaining <= 0) clearInterval(sessionTimerInterval);
   }
   tick();
   sessionTimerInterval = setInterval(tick, 1000);
+}
+
+/* 세션 연장 — 만료 시각과 무관하게 지금 바로 새 토큰을 발급받는다.
+   성공하면 onAuthStateChange가 TOKEN_REFRESHED 이벤트로 카운트다운을 다시 시작해준다. */
+async function handleExtendSession() {
+  const btn = document.getElementById("sessionExtendBtn");
+  btn.disabled = true;
+  try {
+    const { error } = await sb.auth.refreshSession();
+    if (error) throw error;
+    showToast("세션을 연장했습니다.");
+  } catch (e) {
+    showToast("세션 연장에 실패했습니다: " + e.message);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function showAuthScreen() {
